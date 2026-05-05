@@ -1,0 +1,105 @@
+"use client";
+
+import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { LoaderCircle } from "lucide-react";
+import { Button, InputShell, Panel } from "@/components/ui";
+
+export function LoginScreen() {
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setLoading(true);
+    setError("");
+
+    const response = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password })
+    });
+
+    const payload = (await response.json()) as { error?: string };
+
+    if (!response.ok) {
+      setError(payload.error || "Unable to sign in.");
+      setLoading(false);
+      return;
+    }
+
+    router.replace("/");
+    router.refresh();
+  };
+
+  return (
+    <div className="auth-page">
+      <div className="auth-glow" />
+      <div className="auth-glow-alt" />
+      <div className="auth-glow-third" />
+
+      <Panel className="auth-card">
+        <div className="auth-brand-block">
+          <p className="auth-kicker">Secure sign in</p>
+          <div className="auth-logo-wrap">
+            <Image
+              src="/marks-leaps.png"
+              alt="Marks and Leaps logo"
+              width={320}
+              height={140}
+              className="auth-logo"
+              priority
+            />
+          </div>
+        </div>
+
+        <form className="auth-form" onSubmit={handleSubmit}>
+          <div>
+            <p className="eyebrow">Email</p>
+            <InputShell>
+              <input
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="Enter your work email"
+                autoComplete="email"
+              />
+            </InputShell>
+          </div>
+
+          <div>
+            <p className="eyebrow">Password</p>
+            <InputShell>
+              <input
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Enter your password"
+                autoComplete="current-password"
+              />
+            </InputShell>
+          </div>
+
+          {error ? <p className="error-text">{error}</p> : null}
+
+          <Button className="auth-submit-button" disabled={loading} type="submit">
+            {loading ? (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
+                <LoaderCircle size={18} className="spin" />
+                Signing In...
+              </span>
+            ) : (
+              "Sign In"
+            )}
+          </Button>
+        </form>
+
+        <p className="auth-hint">Protected employee access for Marks & Leaps.</p>
+      </Panel>
+    </div>
+  );
+}

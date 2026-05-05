@@ -1,0 +1,164 @@
+export type ApiEnvelope<T> = {
+  success: boolean;
+  action: string | null;
+  data: T;
+  error: string | null;
+};
+
+export type UserSummary = {
+  employee: string;
+  employeeName: string;
+  userId: string;
+};
+
+export type RunningTimer = {
+  timesheetDetailId: string;
+  timesheetId: string;
+  task: string;
+  taskSubject: string;
+  customerId?: string | null;
+  customerName?: string | null;
+  project?: string | null;
+  projectName?: string | null;
+  activityType?: string | null;
+  notes?: string | null;
+  fromTime: string;
+  toTime?: string | null;
+  hours: number;
+  liveHours?: number;
+  isRunning: boolean;
+};
+
+export type Task = {
+  taskId: string;
+  subject: string;
+  status: string;
+  customerId?: string | null;
+  customerName?: string | null;
+  customerGroup?: string | null;
+  project?: string | null;
+  projectName?: string | null;
+  owner?: string | null;
+  ownerName?: string | null;
+  customProjectType?: string;
+  expEndDate?: string | null;
+  createdOn?: string | null;
+  isOverdue: number;
+};
+
+export type TaskSummary = {
+  total: number;
+  assigned: number;
+  pending: number;
+  inProgress: number;
+  completed: number;
+  overdue: number;
+};
+
+export type OverviewData = {
+  employee: UserSummary;
+  period: { fromDate: string; toDate: string };
+  runningTimer: RunningTimer | null;
+  monthSummary: { trackedHours: number; expectedHours: number };
+  kpis: TaskSummary;
+  recentTasks: Task[];
+  recentClientVisits: TimesheetEntry[];
+};
+
+export type TasksData = {
+  summary: TaskSummary;
+  tasks: Task[];
+};
+
+export type TimesheetEntry = RunningTimer;
+
+export type TimesheetsData = {
+  period: { fromDate: string; toDate: string };
+  runningTimer: RunningTimer | null;
+  summary: { entries: number; completedEntries: number; totalHours: number };
+  timesheets: TimesheetEntry[];
+};
+
+export type CustomerSummary = {
+  customerId: string;
+  customerName: string;
+  customerGroup: string;
+  taskCount: number;
+  pending: number;
+  inProgress: number;
+  completed: number;
+  overdue: number;
+  totalHours: number;
+};
+
+export type CustomersData = {
+  period: { fromDate: string; toDate: string };
+  customers: CustomerSummary[];
+};
+
+export type ReportDefinition = {
+  key: string;
+  label: string;
+};
+
+export type ReportsData = {
+  period: { fromDate: string; toDate: string };
+  availableReports: ReportDefinition[];
+  summary?: {
+    kpiCards?: KpiCardsData["kpis"];
+    hoursByDay?: HoursByDay[];
+  };
+  reportKey?: string;
+  kpiCards?: KpiCardsData["kpis"];
+  hoursByDay?: HoursByDay[];
+  rows?: Array<Record<string, string | number | boolean | null>>;
+};
+
+export type ActivityTypesData = {
+  activityTypes: string[];
+};
+
+export type LeaveBreakdown = {
+  leaveType: string;
+  days: number;
+  applications: number;
+};
+
+export type HoursByDay = {
+  date: string;
+  hours: number;
+};
+
+export type KpiCard = {
+  value: number;
+  label: string;
+  color: string;
+  subLabel?: string;
+  delta?: number;
+  deltaLabel?: string;
+  alert?: boolean;
+  breakdown?: LeaveBreakdown[];
+};
+
+export type ActiveTimerKpi = {
+  isRunning: boolean;
+  liveHours: number;
+  taskSubject?: string | null;
+  customerName?: string | null;
+  fromTime?: string | null;
+};
+
+export type KpiCardsData = {
+  period: { fromDate: string; toDate: string };
+  kpis: {
+    tasksCompleted: KpiCard;
+    tasksInProgress: KpiCard;
+    tasksPending: KpiCard;
+    tasksOverdue: KpiCard;
+    hoursLogged: KpiCard;
+    avgHoursPerDay: KpiCard;
+    leavesTaken: KpiCard;
+    activeTimer: ActiveTimerKpi;
+  };
+  hoursByDay: HoursByDay[];
+};
