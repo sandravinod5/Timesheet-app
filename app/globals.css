@@ -422,7 +422,7 @@ button {
   align-items: center;
   gap: 0.5rem;
 }
-rgb(173,rgb(140, 140, 140)40, 140, 140)73, 171, 171) 171)
+
 .metric-label,
 .eyebrow,
 .chip,
@@ -437,7 +437,7 @@ rgb(173,rgb(140, 140, 140)40, 140, 140)73, 171, 171) 171)
 
 .metric-value,
 .kpi-value {
-  color:rgb(200, 200, 200);
+  color: var(--foreground);
   font-family: "Bahnschrift", "Aptos Display", sans-serif;
   font-size: 1.6rem;
   font-weight: 700;
