@@ -11,10 +11,12 @@ import {
   TrendingUp
 } from "lucide-react";
 import { fetchAction } from "@/lib/client";
+import { showSystemNotification } from "@/lib/notifications";
 import type { ActivityTypesData, OverviewData, Task, TimesheetsData } from "@/lib/types";
 import { formatDuration, formatHours, statusBadgeClass } from "@/lib/utils";
 import { EmptyState, LoadingState, OverviewSkeleton, Panel } from "@/components/ui";
 import { KpiModal } from "@/components/kpi-modal";
+import { useToast } from "@/components/toast-provider";
 import { TimerModal } from "@/components/timer-modal";
 
 function formatClockTime(value?: string | null) {
@@ -45,6 +47,7 @@ function formatPeriodLabel(fromDate?: string, toDate?: string) {
 }
 
 export function OverviewScreen() {
+  const { showToast } = useToast();
   const [data, setData] = useState<OverviewData | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [recent, setRecent] = useState<TimesheetsData | null>(null);
@@ -54,8 +57,8 @@ export function OverviewScreen() {
   const [recentError, setRecentError] = useState<string | null>(null);
   const [kpiType, setKpiType] = useState<string | null>(null);
   const [showTimerModal, setShowTimerModal] = useState(false);
-  const [recentTimesheetsOpen, setRecentTimesheetsOpen] = useState(true);
-  const [recentVisitsOpen, setRecentVisitsOpen] = useState(true);
+  const [recentTimesheetsOpen, setRecentTimesheetsOpen] = useState(false);
+  const [recentVisitsOpen, setRecentVisitsOpen] = useState(false);
   const [elapsed, setElapsed] = useState(0);
 
   const load = async () => {
@@ -140,14 +143,58 @@ export function OverviewScreen() {
   }, [data]);
 
   const startTimer = async (taskId: string, activityType: string) => {
-    await fetchAction("start_timer", { task: taskId, activity_type: activityType }, "POST");
-    setShowTimerModal(false);
-    await load();
+    try {
+      await fetchAction("start_timer", { task: taskId, activity_type: activityType }, "POST");
+      setShowTimerModal(false);
+      showToast({
+        title: "Timer started",
+        message: "Your timer is now running."
+      });
+
+      if (document.visibilityState === "hidden") {
+        await showSystemNotification({
+          title: "Timer started",
+          body: "Your timesheet timer is now running.",
+          tag: "timer-started",
+          url: "/timesheet"
+        });
+      }
+
+      await load();
+    } catch (err) {
+      showToast({
+        title: "Unable to start timer",
+        message: err instanceof Error ? err.message : "Please try again.",
+        variant: "error"
+      });
+    }
   };
 
   const stopTimer = async () => {
-    await fetchAction("stop_timer", undefined, "POST");
-    await load();
+    try {
+      await fetchAction("stop_timer", undefined, "POST");
+      showToast({
+        title: "Timer stopped",
+        message: "Saved to draft entries."
+      });
+
+      if (document.visibilityState === "hidden") {
+        await showSystemNotification({
+          title: "Timer stopped",
+          body: "The timer was saved to your draft entries.",
+          tag: "timer-stopped",
+          url: "/timesheet"
+        });
+      }
+
+      await load();
+    } catch (err) {
+      showToast({
+        title: "Unable to stop timer",
+        message: err instanceof Error ? err.message : "Please try again.",
+        variant: "error"
+      });
+    }
   };
 
   if (loading) {
@@ -252,7 +299,7 @@ export function OverviewScreen() {
             <div>
               <h2 className="panel-title">This Month</h2>
               <p className="panel-subtitle">
-                {formatHours(data.monthSummary.trackedHours)} tracked vs {formatHours(data.monthSummary.expectedHours)} expected
+                {formatHours(data.monthSummary.trackedHours)} tracked vs {formatHours(data.monthSummary.expectedHours)} expected at 8h/day
               </p>
             </div>
             <div className="metric-icon info-gradient">
@@ -273,7 +320,7 @@ export function OverviewScreen() {
 
             <article className="metric-card">
               <div className="metric-top">
-                <span className="metric-label">Expected Hours</span>
+                <span className="metric-label">Expected Hours (8h/day)</span>
                 <span className="metric-icon success-gradient">
                   <Target size={18} />
                 </span>

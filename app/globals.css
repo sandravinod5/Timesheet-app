@@ -1300,6 +1300,96 @@ button {
   padding: 0.75rem;
 }
 
+.toast-viewport {
+  position: fixed;
+  left: 1rem;
+  right: 1rem;
+  bottom: calc(var(--nav-height) + 1.5rem + env(safe-area-inset-bottom, 0px));
+  z-index: 95;
+  display: grid;
+  gap: 0.7rem;
+  pointer-events: none;
+}
+
+.toast-card {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: 0.7rem;
+  padding: 0.9rem 0.95rem;
+  border-radius: 18px;
+  background: linear-gradient(180deg, var(--surface-strong), var(--card-surface-end));
+  border: 1px solid var(--border);
+  box-shadow: inset 1px 1px 0 var(--card-inset-highlight), 10px 10px 24px var(--card-drop-shadow);
+  pointer-events: auto;
+}
+
+.toast-card--success {
+  border-color: rgba(24, 180, 109, 0.24);
+}
+
+.toast-card--error {
+  border-color: rgba(239, 83, 80, 0.26);
+}
+
+.toast-card--info {
+  border-color: rgba(22, 101, 245, 0.24);
+}
+
+.toast-icon {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+
+.toast-icon--success {
+  background: linear-gradient(135deg, #18b46d, #38d39f);
+}
+
+.toast-icon--error {
+  background: linear-gradient(135deg, #ef5350, #ff7a68);
+}
+
+.toast-icon--info {
+  background: linear-gradient(135deg, #1665f5, #39a1ff);
+}
+
+.toast-copy {
+  min-width: 0;
+}
+
+.toast-title,
+.toast-message {
+  margin: 0;
+}
+
+.toast-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+.toast-message {
+  margin-top: 0.2rem;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.toast-close {
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 999px;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .modal-card {
   width: min(38rem, 100%);
   max-height: calc(100dvh - 1.5rem);
@@ -1389,23 +1479,18 @@ button {
 }
 
 .report-date-filter {
-  display: flex;
-  align-items: flex-end;
-  flex-wrap: nowrap;
-  gap: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  align-items: end;
   justify-content: flex-start;
-}
-
-.report-date-field + .report-date-field {
-  margin-left: 1.5rem;
 }
 
 .report-date-field {
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
-  width: 8rem;
-  flex-shrink: 0;
+  width: 100%;
   min-width: 0;
 }
 
@@ -1445,8 +1530,8 @@ button {
   font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
-  flex-shrink: 0;
-  margin-left: auto;
+  width: 100%;
+  grid-column: 1 / -1;
 }
 
 .report-date-apply:disabled {
@@ -2089,6 +2174,16 @@ th {
 
   .report-kpi-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .report-date-filter {
+    grid-template-columns: repeat(2, minmax(8rem, 10rem)) auto;
+    gap: 1rem;
+  }
+
+  .report-date-apply {
+    width: auto;
+    grid-column: auto;
   }
 
   .report-detail-grid {

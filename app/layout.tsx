@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { PwaRegister } from "@/components/pwa-register";
+import { ToastProvider } from "@/components/toast-provider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -12,7 +13,7 @@ export const metadata: Metadata = {
     title: "Planner"
   },
   icons: {
-    icon: "/icon.png",
+    icon: "/icon-512.png",
     apple: "/apple-touch-icon.png"
   }
 };
@@ -32,8 +33,10 @@ export default function RootLayout({
   return (
     <html lang="en" data-theme="dark">
       <body>
-        <PwaRegister />
-        {children}
+        <ToastProvider>
+          <PwaRegister />
+          {children}
+        </ToastProvider>
       </body>
     </html>
   );

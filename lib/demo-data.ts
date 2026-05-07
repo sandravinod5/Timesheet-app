@@ -137,8 +137,30 @@ let runningTimer: RunningTimer | null = {
   isRunning: true
 };
 
+const STANDARD_HOURS_PER_DAY = 8;
+
 function isoNowText() {
   return new Date().toISOString().slice(0, 19).replace("T", " ");
+}
+
+function getWorkingDays(fromDate: string, toDate: string) {
+  const current = new Date(`${fromDate}T00:00:00`);
+  const end = new Date(`${toDate}T00:00:00`);
+  let workingDays = 0;
+
+  while (current <= end) {
+    const day = current.getDay();
+    if (day !== 0 && day !== 6) {
+      workingDays += 1;
+    }
+    current.setDate(current.getDate() + 1);
+  }
+
+  return workingDays;
+}
+
+function getExpectedHours(fromDate: string, toDate: string) {
+  return getWorkingDays(fromDate, toDate) * STANDARD_HOURS_PER_DAY;
 }
 
 function getFilteredTasks(params: Record<string, string>) {
@@ -212,6 +234,10 @@ function getTrackedHours() {
 }
 
 function getOverviewData(): OverviewData {
+  const period = {
+    fromDate: "2026-05-01",
+    toDate: "2026-05-04"
+  };
   const kpis = buildTaskSummary(tasksSeed);
   const recentClientVisits = demoTimesheets.filter((entry) => {
     const haystack = [entry.activityType, entry.taskSubject, entry.customerName, entry.projectName, entry.notes]
@@ -227,14 +253,11 @@ function getOverviewData(): OverviewData {
       employeeName: "Demo Employee",
       userId: "employee@erpnext.local"
     },
-    period: {
-      fromDate: "2026-05-01",
-      toDate: "2026-05-04"
-    },
+    period,
     runningTimer,
     monthSummary: {
       trackedHours: getTrackedHours(),
-      expectedHours: 32
+      expectedHours: getExpectedHours(period.fromDate, period.toDate)
     },
     kpis,
     recentTasks: tasksSeed.slice(0, 4),
@@ -428,7 +451,8 @@ function getReports(reportKey?: string) {
 function getKpiCards(): KpiCardsData {
   const summary = buildTaskSummary(tasksSeed);
   const tracked = Number(getTrackedHours().toFixed(2));
-  const expected = 32;
+  const period = { fromDate: "2026-05-01", toDate: "2026-05-05" };
+  const expected = getExpectedHours(period.fromDate, period.toDate);
   const delta = Number((tracked - expected).toFixed(2));
   const daysWorked = 3;
   void daysWorked;
@@ -438,7 +462,7 @@ function getKpiCards(): KpiCardsData {
     : 0;
 
   return {
-    period: { fromDate: "2026-05-01", toDate: "2026-05-05" },
+    period,
     kpis: {
       tasksCompleted: { value: summary.completed, label: "Completed", color: "green" },
       tasksInProgress: { value: summary.inProgress, label: "In Progress", color: "blue" },
@@ -448,9 +472,9 @@ function getKpiCards(): KpiCardsData {
         value: tracked,
         label: "Hours Logged",
         color: "purple",
-        subLabel: `of ${expected} expected`,
+        subLabel: `of ${expected} expected at 8h/day`,
         delta,
-        deltaLabel: `${delta >= 0 ? "+" : ""}${delta}h vs expected`
+        deltaLabel: `${delta >= 0 ? "+" : ""}${delta}h vs 8h/day standard`
       },
       visitCount: {
         value: 3,
