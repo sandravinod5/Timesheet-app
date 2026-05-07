@@ -431,7 +431,7 @@ function getKpiCards(): KpiCardsData {
   const expected = 32;
   const delta = Number((tracked - expected).toFixed(2));
   const daysWorked = 3;
-  const avgHours = Number((tracked / daysWorked).toFixed(2));
+  void daysWorked;
 
   const liveHours = runningTimer
     ? Number(((Date.now() - new Date(runningTimer.fromTime).getTime()) / 3600000).toFixed(2))
@@ -452,11 +452,14 @@ function getKpiCards(): KpiCardsData {
         delta,
         deltaLabel: `${delta >= 0 ? "+" : ""}${delta}h vs expected`
       },
-      avgHoursPerDay: {
-        value: avgHours,
-        label: "Avg hrs / Day",
+      visitCount: {
+        value: 3,
+        label: "Total Visits",
         color: "teal",
-        subLabel: `${daysWorked} days worked`
+        visitBreakdown: [
+          { customerId: "CUST-001", customerName: "Alpha Corp", visitCount: 2, visitDates: ["2026-05-02", "2026-05-05"] },
+          { customerId: "CUST-002", customerName: "Beta Ltd", visitCount: 1, visitDates: ["2026-05-04"] }
+        ]
       },
       leavesTaken: {
         value: 0.5,

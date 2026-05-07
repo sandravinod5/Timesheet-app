@@ -129,6 +129,13 @@ export type HoursByDay = {
   hours: number;
 };
 
+export type VisitByCustomer = {
+  customerId: string;
+  customerName: string;
+  visitCount: number;
+  visitDates: string[];
+};
+
 export type KpiCard = {
   value: number;
   label: string;
@@ -138,6 +145,7 @@ export type KpiCard = {
   deltaLabel?: string;
   alert?: boolean;
   breakdown?: LeaveBreakdown[];
+  visitBreakdown?: VisitByCustomer[];
 };
 
 export type ActiveTimerKpi = {
@@ -156,7 +164,7 @@ export type KpiCardsData = {
     tasksPending: KpiCard;
     tasksOverdue: KpiCard;
     hoursLogged: KpiCard;
-    avgHoursPerDay: KpiCard;
+    visitCount: KpiCard;
     leavesTaken: KpiCard;
     activeTimer: ActiveTimerKpi;
   };

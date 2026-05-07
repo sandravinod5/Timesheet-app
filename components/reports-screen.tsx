@@ -2,18 +2,26 @@
 
 import {
   BarChart3,
-  CalendarDays,
   Clock3,
+  MapPin,
   PieChart,
   TimerReset,
-  TrendingUp,
-  Users
+  TrendingUp
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { fetchAction } from "@/lib/client";
-import type { HoursByDay, KpiCardsData, ReportsData } from "@/lib/types";
+import type { HoursByDay, KpiCardsData, ReportsData, VisitByCustomer } from "@/lib/types";
 import { formatHours } from "@/lib/utils";
 import { EmptyState, LoadingState, Panel } from "@/components/ui";
+
+function todayStr() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function firstOfMonthStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+}
 
 function colorClass(color?: string) {
   switch (color) {
@@ -47,13 +55,19 @@ function formatDateLabel(value: string) {
   });
 }
 
-function formatPeriodLabel(fromDate?: string, toDate?: string) {
-  if (!fromDate || !toDate) {
-    return "Current period";
+function formatVisitDateLabel(value: string) {
+  const parsed = new Date(value.includes("T") ? value : `${value}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
   }
 
-  return `${fromDate} to ${toDate}`;
+  return parsed.toLocaleDateString([], {
+    year: "numeric",
+    month: "short",
+    day: "numeric"
+  });
 }
+
 
 function formatTimerClock(value?: string | null) {
   if (!value) {
@@ -183,17 +197,64 @@ function normalizeHoursByDay(rows?: Array<Record<string, string | number | boole
   }));
 }
 
-type ReportRow = Record<string, string | number | boolean | null>;
+function VisitBreakdown({ rows }: { rows: VisitByCustomer[] }) {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  if (rows.length === 0) {
+    return <EmptyState title="No visits" copy="No visits recorded for this period." />;
+  }
+
+  return (
+    <div className="visit-breakdown">
+      {rows.map((row) => {
+        const isOpen = expandedId === row.customerId;
+        return (
+          <div key={row.customerId} className="visit-breakdown-customer">
+            <button
+              type="button"
+              className="visit-breakdown-row"
+              onClick={() => setExpandedId(isOpen ? null : row.customerId)}
+            >
+              <span className="visit-breakdown-name">{row.customerName}</span>
+              <span className="visit-breakdown-right">
+                <span className="visit-breakdown-count">{row.visitCount} {row.visitCount === 1 ? "visit" : "visits"}</span>
+                <span className="visit-breakdown-chevron">{isOpen ? "▲" : "▼"}</span>
+              </span>
+            </button>
+            {isOpen && (
+              <div className="visit-breakdown-dates">
+                {row.visitDates && row.visitDates.length > 0 ? (
+                  row.visitDates.map((date) => (
+                    <span key={date} className="visit-date-chip">{formatVisitDateLabel(date)}</span>
+                  ))
+                ) : (
+                  <span className="visit-date-chip">No date info — update server script</span>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export function ReportsScreen() {
   const [dashboardPayload, setDashboardPayload] = useState<ReportsData | null>(null);
   const [detailPayload, setDetailPayload] = useState<ReportsData | null>(null);
   const [selectedReport, setSelectedReport] = useState<string>("kpi_cards");
   const [loading, setLoading] = useState(true);
+  const [showVisitBreakdown, setShowVisitBreakdown] = useState(false);
+  const [fromDate, setFromDate] = useState(firstOfMonthStr());
+  const [toDate, setToDate] = useState(todayStr());
+  const [pendingFrom, setPendingFrom] = useState(firstOfMonthStr());
+  const [pendingTo, setPendingTo] = useState(todayStr());
 
-  const load = async (reportKey: string = "kpi_cards") => {
+  const load = async (reportKey: string = "kpi_cards", from?: string, to?: string) => {
     setLoading(true);
-    const params = reportKey ? { report_key: reportKey } : undefined;
+    const params: Record<string, string> = { report_key: reportKey };
+    if (from) params.from_date = from;
+    if (to) params.to_date = to;
     const response = await fetchAction<ReportsData>("reports", params);
     const nextPayload = response.data;
 
@@ -206,21 +267,25 @@ export function ReportsScreen() {
     setLoading(false);
   };
 
-  useEffect(() => {
-    void load("kpi_cards");
-  }, []);
+  const applyDateFilter = () => {
+    setFromDate(pendingFrom);
+    setToDate(pendingTo);
+    setDashboardPayload(null);
+    void load("kpi_cards", pendingFrom, pendingTo);
+  };
 
-  const periodLabel = useMemo(() => {
-    return formatPeriodLabel(dashboardPayload?.period.fromDate, dashboardPayload?.period.toDate);
-  }, [dashboardPayload]);
+  useEffect(() => {
+    void load("kpi_cards", fromDate, toDate);
+  }, []);
 
   const kpiCards = dashboardPayload?.kpiCards || dashboardPayload?.summary?.kpiCards;
   const hoursByDay =
     dashboardPayload?.hoursByDay ||
     dashboardPayload?.summary?.hoursByDay ||
     (selectedReport === "hours_by_day" ? normalizeHoursByDay(detailPayload?.rows) : []);
-  const availableReports = detailPayload?.availableReports || dashboardPayload?.availableReports || [];
-  const leaveRows = detailPayload?.rows || [];
+  const availableReports = (detailPayload?.availableReports || dashboardPayload?.availableReports || []).filter(
+    (report) => report.key !== "leave_breakdown"
+  );
   const activeTimerRow = detailPayload?.rows?.[0] || null;
 
   if (loading) {
@@ -234,16 +299,44 @@ export function ReportsScreen() {
   return (
     <div className="screen-stack screen-stack--single report-dashboard">
       <Panel>
-        <div className="panel-title-row panel-title-row-stack">
-          <div>
-            <h2 className="panel-title">My Reports</h2>
-            <p className="panel-subtitle">
-              Personal insights for {periodLabel}. Built for the logged-in employee.
-            </p>
-          </div>
-          <div className="report-period-chip">
-            <CalendarDays size={16} />
-            <span>{periodLabel}</span>
+        <div className="report-date-header">
+          <h2 className="panel-title">My Reports</h2>
+          <div className="report-date-filter">
+            <div className="report-date-field">
+              <label className="report-date-label" htmlFor="report-from-date">
+                From
+              </label>
+              <input
+                id="report-from-date"
+                type="date"
+                className="report-date-input"
+                value={pendingFrom}
+                max={pendingTo}
+                onChange={(e) => setPendingFrom(e.target.value)}
+              />
+            </div>
+            <div className="report-date-field">
+              <label className="report-date-label" htmlFor="report-to-date">
+                To
+              </label>
+              <input
+                id="report-to-date"
+                type="date"
+                className="report-date-input"
+                value={pendingTo}
+                min={pendingFrom}
+                max={todayStr()}
+                onChange={(e) => setPendingTo(e.target.value)}
+              />
+            </div>
+            <button
+              type="button"
+              className="report-date-apply"
+              onClick={applyDateFilter}
+              disabled={loading}
+            >
+              Apply
+            </button>
           </div>
         </div>
 
@@ -270,6 +363,31 @@ export function ReportsScreen() {
               color={kpiCards.tasksOverdue.color}
               alert={kpiCards.tasksOverdue.alert}
             />
+            {kpiCards.visitCount ? (
+              <button
+                type="button"
+                className={`report-kpi-card report-kpi-card--clickable ${showVisitBreakdown ? "is-active" : ""}`}
+                onClick={() => setShowVisitBreakdown((v) => !v)}
+              >
+                <div className="report-kpi-top">
+                  <p className="kpi-label">{kpiCards.visitCount.label}</p>
+                  <span className="kpi-icon info-gradient">
+                    <MapPin size={18} />
+                  </span>
+                </div>
+                <span className="report-kpi-value">{kpiCards.visitCount.value}</span>
+                <p className="report-kpi-copy">Tap to see by customer</p>
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+
+        {showVisitBreakdown && kpiCards?.visitCount ? (
+          <div className="visit-breakdown-panel">
+            <p className="visit-breakdown-title">
+              <MapPin size={13} /> Visits by Customer
+            </p>
+            <VisitBreakdown rows={kpiCards.visitCount.visitBreakdown ?? ([] as VisitByCustomer[])} />
           </div>
         ) : null}
       </Panel>
@@ -291,7 +409,7 @@ export function ReportsScreen() {
               key={report.key}
               className={`report-switcher-button ${selectedReport === report.key ? "is-active" : ""}`}
               type="button"
-              onClick={() => void load(report.key)}
+              onClick={() => void load(report.key, fromDate, toDate)}
             >
               <span>{report.label}</span>
             </button>
@@ -358,28 +476,7 @@ export function ReportsScreen() {
       </Panel>
 
       <Panel>
-        {selectedReport === "leave_breakdown" ? (
-          leaveRows.length === 0 ? (
-            <EmptyState title="No leave data" copy="There are no approved leave entries in this period." />
-          ) : (
-            <div className="report-list-stack">
-              {leaveRows.map((row, index) => {
-                const item = row as ReportRow;
-                return (
-                  <article key={`${selectedReport}-${index}`} className="report-list-item">
-                    <div className="report-list-head">
-                      <div>
-                        <h3 className="list-title">{String(item.leaveType || item.leave_type || "Leave")}</h3>
-                        <p className="panel-subtitle">{Number(item.applications || 0)} applications</p>
-                      </div>
-                      <span className="report-list-value">{Number(item.days || 0).toFixed(1)} days</span>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          )
-        ) : selectedReport === "active_timer" ? (
+        {selectedReport === "active_timer" ? (
           activeTimerRow ? (
             <div className="report-active-detail">
               <div className="report-stat-grid">
@@ -430,38 +527,6 @@ export function ReportsScreen() {
                   subLabel={kpiCards.hoursLogged.subLabel}
                   deltaLabel={kpiCards.hoursLogged.deltaLabel}
                 />
-                <ReportKpiCard
-                  label="Avg hrs / Day"
-                  value={kpiCards.avgHoursPerDay.value}
-                  color={kpiCards.avgHoursPerDay.color}
-                  subLabel={kpiCards.avgHoursPerDay.subLabel}
-                />
-                <ReportKpiCard
-                  label="Leaves Taken"
-                  value={kpiCards.leavesTaken.value}
-                  color={kpiCards.leavesTaken.color}
-                  subLabel={`${kpiCards.leavesTaken.breakdown?.length || 0} leave types`}
-                />
-                <article className="report-kpi-card report-kpi-card--tall">
-                  <div className="report-kpi-top">
-                    <p className="kpi-label">Leaves Breakdown</p>
-                    <span className="kpi-icon info-gradient">
-                      <Users size={18} />
-                    </span>
-                  </div>
-                  <div className="report-breakdown">
-                    {kpiCards.leavesTaken.breakdown?.length ? (
-                      kpiCards.leavesTaken.breakdown.map((item) => (
-                        <div key={item.leaveType} className="report-breakdown-row">
-                          <span>{item.leaveType}</span>
-                          <span>{item.days.toFixed(1)} days</span>
-                        </div>
-                      ))
-                    ) : (
-                      <EmptyState title="No leave breakdown" copy="There are no leave entries to display." />
-                    )}
-                  </div>
-                </article>
               </>
             ) : (
               <EmptyState title="Choose a view" copy="Select a report view above to see the detail cards." />

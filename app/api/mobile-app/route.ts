@@ -56,6 +56,15 @@ function formatErrorMessage(error: unknown) {
   return "ERPNext request could not be completed.";
 }
 
+function isUnsupportedActivityTypesError(action: string, error: unknown) {
+  if (action !== "activity_types") {
+    return false;
+  }
+
+  const message = formatErrorMessage(error).toLowerCase();
+  return message.includes("unsupported action") && message.includes("activity_types");
+}
+
 async function handleRequest(request: NextRequest) {
   const params = await getRequestParams(request);
   const action = params.action;
@@ -85,6 +94,17 @@ async function handleRequest(request: NextRequest) {
       status: payload.success ? 200 : 400
     });
   } catch (error) {
+    if (isUnsupportedActivityTypesError(action, error)) {
+      return NextResponse.json({
+        success: true,
+        action,
+        data: {
+          activityTypes: ["Working"]
+        },
+        error: null
+      });
+    }
+
     return NextResponse.json(
       {
         success: false,

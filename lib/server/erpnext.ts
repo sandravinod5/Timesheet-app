@@ -114,7 +114,23 @@ export async function loginToErpNext(email: string, password: string): Promise<S
 }
 
 export function createSessionCookies(response: NextResponse, session: SessionData) {
+  const encodedUser = encodeURIComponent(JSON.stringify(session.user));
+
   response.cookies.set("task_mobile_user", JSON.stringify(session.user), {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 60 * 60 * 12
+  });
+  response.cookies.set("task_mobile_user_encoded", encodedUser, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 60 * 60 * 12
+  });
+  response.cookies.set("task_mobile_authenticated", "1", {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
@@ -135,6 +151,8 @@ export function createSessionCookies(response: NextResponse, session: SessionDat
 
 export function clearSessionCookies(response: NextResponse) {
   response.cookies.set("task_mobile_user", "", { path: "/", maxAge: 0 });
+  response.cookies.set("task_mobile_user_encoded", "", { path: "/", maxAge: 0 });
+  response.cookies.set("task_mobile_authenticated", "", { path: "/", maxAge: 0 });
   response.cookies.set("erpnext_sid", "", { path: "/", maxAge: 0 });
 }
 
@@ -172,6 +190,25 @@ function getAuthHeaders(sid?: string): Record<string, string> {
   return {};
 }
 
+async function fetchMobileAppPayload(url: string, headers: Record<string, string>) {
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      Accept: "application/json",
+      ...headers
+    },
+    cache: "no-store"
+  });
+
+  const payload = (await response.json().catch(() => ({}))) as {
+    message?: unknown;
+    exception?: string;
+    exc?: string;
+  };
+
+  return { response, payload };
+}
+
 export async function callErpNextMobileApp(
   action: string,
   params: Record<string, string>,
@@ -188,20 +225,14 @@ export async function callErpNextMobileApp(
     }
   });
 
-  const response = await fetch(`${baseUrl}/api/method/${methodName}?${query.toString()}`, {
-    method: "GET",
-    headers: {
-      Accept: "application/json",
-      ...getAuthHeaders(sid)
-    },
-    cache: "no-store"
-  });
+  const url = `${baseUrl}/api/method/${methodName}?${query.toString()}`;
+  let { response, payload } = await fetchMobileAppPayload(url, getAuthHeaders(sid));
 
-  const payload = (await response.json().catch(() => ({}))) as {
-    message?: unknown;
-    exception?: string;
-    exc?: string;
-  };
+  // Some ERPNext sessions can expire or lose permission context while API token access
+  // still works. Retry once with token auth so the mobile app remains usable.
+  if (!response.ok && sid && apiKey && apiSecret) {
+    ({ response, payload } = await fetchMobileAppPayload(url, getAuthHeaders(undefined)));
+  }
 
   if (!response.ok) {
     throw new Error(extractErpErrorMessage(payload));

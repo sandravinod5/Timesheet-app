@@ -1,13 +1,11 @@
 "use client";
 
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { LoaderCircle } from "lucide-react";
 import { Button, InputShell, Panel } from "@/components/ui";
 
 export function LoginScreen() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -32,8 +30,7 @@ export function LoginScreen() {
       return;
     }
 
-    router.replace("/");
-    router.refresh();
+    window.location.assign("/");
   };
 
   return (

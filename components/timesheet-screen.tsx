@@ -22,29 +22,46 @@ export function TimesheetScreen() {
     setLoading(true);
     setError(null);
 
-    try {
-      const [timesheets, tasksPayload, activityTypesPayload] = await Promise.all([
-        fetchAction<TimesheetsData>("timesheets"),
-        fetchAction<{ tasks: Task[] }>("tasks"),
-        fetchAction<ActivityTypesData>("activity_types")
-      ]);
+    const [timesheetsResult, tasksResult, activityTypesResult] = await Promise.allSettled([
+      fetchAction<TimesheetsData>("timesheets"),
+      fetchAction<{ tasks: Task[] }>("tasks"),
+      fetchAction<ActivityTypesData>("activity_types")
+    ]);
 
-      setPayload(timesheets.data);
-      setTasks(tasksPayload.data.tasks);
-      setActivityTypes(activityTypesPayload.data.activityTypes);
-    } catch (loadError) {
+    if (timesheetsResult.status === "fulfilled") {
+      setPayload(timesheetsResult.value.data);
+    } else {
       setPayload(null);
-      setTasks([]);
-      setActivityTypes([]);
-      setError(loadError instanceof Error ? loadError.message : "Timesheet data could not be loaded.");
-    } finally {
-      setLoading(false);
+      setError(
+        timesheetsResult.reason instanceof Error
+          ? timesheetsResult.reason.message
+          : "Timesheet data could not be loaded."
+      );
     }
+
+    if (tasksResult.status === "fulfilled") {
+      setTasks(tasksResult.value.data.tasks);
+    } else {
+      setTasks([]);
+    }
+
+    if (activityTypesResult.status === "fulfilled") {
+      setActivityTypes(activityTypesResult.value.data.activityTypes);
+    } else {
+      setActivityTypes([]);
+    }
+
+    setLoading(false);
   };
 
   useEffect(() => {
     void load();
   }, []);
+
+  const lastWorkedId = useMemo(() => {
+    const entry = payload?.timesheets?.find((e) => !e.isRunning);
+    return entry?.timesheetDetailId ?? null;
+  }, [payload?.timesheets]);
 
   const filteredTimesheets = useMemo(() => {
     if (!payload?.timesheets) {
@@ -135,23 +152,32 @@ export function TimesheetScreen() {
             {filteredTimesheets.length === 0 ? (
               <EmptyState title="No timesheets found" copy="Start a timer or change the current filter." />
             ) : (
-              filteredTimesheets.map((entry) => (
-                <article key={entry.timesheetDetailId} className="list-card">
-                  <div className="list-head">
-                    <div className="list-head-copy">
-                      <h3 className="list-title">{entry.taskSubject}</h3>
-                      <p className="panel-subtitle">{entry.customerName || "No customer"}</p>
+              filteredTimesheets.map((entry) => {
+                const isLastWorked = entry.timesheetDetailId === lastWorkedId;
+                return (
+                  <article key={entry.timesheetDetailId} className={`list-card ${isLastWorked ? "list-card--highlighted" : ""}`}>
+                    {isLastWorked && (
+                      <div className="last-worked-badge">
+                        <Clock3 size={11} />
+                        Last worked on
+                      </div>
+                    )}
+                    <div className="list-head">
+                      <div className="list-head-copy">
+                        <h3 className="list-title">{entry.taskSubject}</h3>
+                        <p className="panel-subtitle">{entry.customerName || "No customer"}</p>
+                      </div>
+                      <span className={`badge ${entry.isRunning ? "badge-progress" : "badge-complete"}`}>
+                        {entry.isRunning ? "Running" : formatHours(entry.hours)}
+                      </span>
                     </div>
-                    <span className={`badge ${entry.isRunning ? "badge-progress" : "badge-complete"}`}>
-                      {entry.isRunning ? "Running" : formatHours(entry.hours)}
-                    </span>
-                  </div>
-                  <p className="list-description task-supporting-copy">{entry.projectName || "No project"}</p>
-                  <div className="muted-row time-range-row" style={{ marginTop: "0.8rem" }}>
-                    {entry.fromTime} {entry.toTime ? `to ${entry.toTime}` : "to now"}
-                  </div>
-                </article>
-              ))
+                    <p className="list-description task-supporting-copy">{entry.projectName || "No project"}</p>
+                    <div className="muted-row time-range-row" style={{ marginTop: "0.8rem" }}>
+                      {entry.fromTime} {entry.toTime ? `to ${entry.toTime}` : "to now"}
+                    </div>
+                  </article>
+                );
+              })
             )}
           </div>
         </Panel>
