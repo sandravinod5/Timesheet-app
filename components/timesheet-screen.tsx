@@ -17,6 +17,7 @@ export function TimesheetScreen() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [showTimerModal, setShowTimerModal] = useState(false);
+  const [stopping, setStopping] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -84,8 +85,16 @@ export function TimesheetScreen() {
   };
 
   const stopTimer = async () => {
-    await fetchAction("stop_timer", undefined, "POST");
-    await load();
+    if (stopping) return;
+    setStopping(true);
+    try {
+      await fetchAction("stop_timer", undefined, "POST");
+    } catch {
+      // ignore — load() below will refresh state regardless
+    } finally {
+      setStopping(false);
+      await load();
+    }
   };
 
   if (loading) {
@@ -107,9 +116,13 @@ export function TimesheetScreen() {
             </div>
             <div className="button-row button-row-end">
               {payload.runningTimer ? (
-                <button className="timer-action-button timer-action-button-stop" onClick={() => void stopTimer()}>
+                <button
+                  className="timer-action-button timer-action-button-stop"
+                  onClick={() => void stopTimer()}
+                  disabled={stopping}
+                >
                   <Square size={18} />
-                  Stop Timer
+                  {stopping ? "Stopping…" : "Stop Timer"}
                 </button>
               ) : (
                 <button className="timer-action-button timer-action-button-start" onClick={() => setShowTimerModal(true)}>

@@ -82,10 +82,11 @@ export function AppShell({ children, user }: AppShellProps) {
     document.documentElement.setAttribute("data-theme", next ? "dark" : "light");
   };
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
     setProfileOpen(false);
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.replace("/login");
+    fetch("/api/auth/logout", { method: "POST" }).finally(() => {
+      router.replace("/login");
+    });
   };
 
   return (
@@ -93,9 +94,9 @@ export function AppShell({ children, user }: AppShellProps) {
       <header className="app-header">
         <div className="header-card">
           <div className="brand">
-            <div className="brand-logo-wrap">
+            <button className="brand-logo-wrap" onClick={() => router.push("/")} aria-label="Go to overview" type="button" style={{ background: "none", border: "none", padding: 0, cursor: "pointer" }}>
               <Image src="/marks-leaps.png" alt="Marks and Leaps logo" width={150} height={66} className="brand-logo" priority />
-            </div>
+            </button>
             <div className="header-actions">
               <button className="ghost-button" onClick={toggleTheme} aria-label="Toggle theme">
                 {dark ? <Sun size={18} /> : <Moon size={18} />}

@@ -228,9 +228,14 @@ export async function callErpNextMobileApp(
   const url = `${baseUrl}/api/method/${methodName}?${query.toString()}`;
   let { response, payload } = await fetchMobileAppPayload(url, getAuthHeaders(sid));
 
-  // Some ERPNext sessions can expire or lose permission context while API token access
-  // still works. Retry once with token auth so the mobile app remains usable.
-  if (!response.ok && sid && apiKey && apiSecret) {
+  // Only retry with API token when the failure is a genuine session/auth problem,
+  // not when our script returned an application-level error (success: false in message).
+  // Retrying on app errors re-runs the request as a different admin user, which causes
+  // ownership checks to fail with misleading "Access denied" errors.
+  const appMessage = payload.message as Record<string, unknown> | undefined;
+  const isAppError = appMessage && typeof appMessage === "object" && appMessage.success === false;
+
+  if (!response.ok && !isAppError && sid && apiKey && apiSecret) {
     ({ response, payload } = await fetchMobileAppPayload(url, getAuthHeaders(undefined)));
   }
 

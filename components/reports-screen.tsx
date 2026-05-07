@@ -2,15 +2,18 @@
 
 import {
   BarChart3,
+  Check,
   Clock3,
+  FileEdit,
   MapPin,
   PieChart,
   TimerReset,
-  TrendingUp
+  TrendingUp,
+  X
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { fetchAction } from "@/lib/client";
-import type { HoursByDay, KpiCardsData, ReportsData, VisitByCustomer } from "@/lib/types";
+import type { DraftEntry, DraftsData, HoursByDay, KpiCardsData, ReportsData, VisitByCustomer } from "@/lib/types";
 import { formatHours } from "@/lib/utils";
 import { EmptyState, LoadingState, Panel } from "@/components/ui";
 
@@ -239,6 +242,148 @@ function VisitBreakdown({ rows }: { rows: VisitByCustomer[] }) {
   );
 }
 
+function toDateTimeLocal(value: string) {
+  return value.replace(" ", "T").slice(0, 16);
+}
+
+function fromDateTimeLocal(value: string) {
+  return value.replace("T", " ") + ":00";
+}
+
+function formatEntryTime(value: string) {
+  const parsed = new Date(value.includes("T") ? value : value.replace(" ", "T"));
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+function DraftsList({
+  drafts,
+  onEdit,
+  onSubmit,
+  editingId,
+  editFrom,
+  editTo,
+  onEditFromChange,
+  onEditToChange,
+  onSaveEdit,
+  onCancelEdit,
+  saving
+}: {
+  drafts: DraftEntry[];
+  onEdit: (entry: DraftEntry) => void;
+  onSubmit: (entry: DraftEntry) => void;
+  editingId: string | null;
+  editFrom: string;
+  editTo: string;
+  onEditFromChange: (v: string) => void;
+  onEditToChange: (v: string) => void;
+  onSaveEdit: () => void;
+  onCancelEdit: () => void;
+  saving: boolean;
+}) {
+  if (drafts.length === 0) {
+    return <EmptyState title="No drafts" copy="Stopped timers will appear here for review before submission." />;
+  }
+
+  return (
+    <div className="list-stack">
+      {drafts.map((entry) => {
+        const isEditing = editingId === entry.timesheetDetailId;
+        return (
+          <article key={entry.timesheetDetailId} className="list-card">
+            <div className="list-head">
+              <div className="list-head-copy">
+                <h3 className="list-title">{entry.taskSubject || "No task"}</h3>
+                <p className="panel-subtitle">{entry.customerName || "No customer"}</p>
+              </div>
+              <span className="badge badge-complete">{formatHours(entry.hours)}</span>
+            </div>
+            <p className="list-description task-supporting-copy">{entry.projectName || entry.activityType || "No project"}</p>
+
+            {isEditing ? (
+              <div className="draft-edit-form">
+                <div className="draft-edit-row">
+                  <label className="report-date-label">From</label>
+                  <input
+                    type="datetime-local"
+                    className="report-date-input"
+                    value={editFrom}
+                    max={editTo || undefined}
+                    onChange={(e) => onEditFromChange(e.target.value)}
+                  />
+                </div>
+                <div className="draft-edit-row">
+                  <label className="report-date-label">To</label>
+                  <input
+                    type="datetime-local"
+                    className="report-date-input"
+                    value={editTo}
+                    min={editFrom || undefined}
+                    onChange={(e) => onEditToChange(e.target.value)}
+                  />
+                </div>
+                <div className="button-row" style={{ marginTop: "0.5rem" }}>
+                  <button
+                    type="button"
+                    className="timer-action-button timer-action-button-start"
+                    onClick={onSaveEdit}
+                    disabled={saving}
+                  >
+                    <Check size={15} />
+                    Save
+                  </button>
+                  <button
+                    type="button"
+                    className="timer-action-button"
+                    onClick={onCancelEdit}
+                    disabled={saving}
+                  >
+                    <X size={15} />
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="muted-row time-range-row" style={{ marginTop: "0.8rem" }}>
+                {formatEntryTime(entry.fromTime)} → {formatEntryTime(entry.toTime)}
+              </div>
+            )}
+
+            {!isEditing && (
+              <div className="button-row" style={{ marginTop: "0.8rem" }}>
+                <button
+                  type="button"
+                  className="timer-action-button"
+                  onClick={() => onEdit(entry)}
+                >
+                  <FileEdit size={15} />
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  className="timer-action-button timer-action-button-start"
+                  onClick={() => onSubmit(entry)}
+                  disabled={!entry.canSubmit}
+                  title={entry.canSubmit ? undefined : "Stop the running timer first"}
+                >
+                  <Check size={15} />
+                  Submit
+                </button>
+              </div>
+            )}
+
+            {!entry.canSubmit && !isEditing && (
+              <p className="panel-subtitle" style={{ marginTop: "0.4rem", color: "var(--warning)" }}>
+                Timer still running in this timesheet — stop it first to submit.
+              </p>
+            )}
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
 export function ReportsScreen() {
   const [dashboardPayload, setDashboardPayload] = useState<ReportsData | null>(null);
   const [detailPayload, setDetailPayload] = useState<ReportsData | null>(null);
@@ -249,6 +394,26 @@ export function ReportsScreen() {
   const [toDate, setToDate] = useState(todayStr());
   const [pendingFrom, setPendingFrom] = useState(firstOfMonthStr());
   const [pendingTo, setPendingTo] = useState(todayStr());
+
+  const [drafts, setDrafts] = useState<DraftEntry[]>([]);
+  const [draftsLoading, setDraftsLoading] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editFrom, setEditFrom] = useState("");
+  const [editTo, setEditTo] = useState("");
+  const [draftSaving, setDraftSaving] = useState(false);
+  const [draftError, setDraftError] = useState<string | null>(null);
+
+  const loadDrafts = async () => {
+    setDraftsLoading(true);
+    try {
+      const response = await fetchAction<DraftsData>("draft_entries");
+      setDrafts(response.data?.drafts ?? []);
+    } catch {
+      setDrafts([]);
+    } finally {
+      setDraftsLoading(false);
+    }
+  };
 
   const load = async (reportKey: string = "kpi_cards", from?: string, to?: string) => {
     setLoading(true);
@@ -274,8 +439,51 @@ export function ReportsScreen() {
     void load("kpi_cards", pendingFrom, pendingTo);
   };
 
+  const handleEdit = (entry: DraftEntry) => {
+    setEditingId(entry.timesheetDetailId);
+    setEditFrom(toDateTimeLocal(entry.fromTime));
+    setEditTo(toDateTimeLocal(entry.toTime));
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingId) return;
+    setDraftSaving(true);
+    setDraftError(null);
+    try {
+      await fetchAction(
+        "update_draft_entry",
+        {
+          timesheet_detail_id: editingId,
+          from_time: fromDateTimeLocal(editFrom),
+          to_time: fromDateTimeLocal(editTo)
+        },
+        "POST"
+      );
+      setEditingId(null);
+      await loadDrafts();
+    } catch (err) {
+      setDraftError(err instanceof Error ? err.message : "Failed to save changes.");
+    } finally {
+      setDraftSaving(false);
+    }
+  };
+
+  const handleSubmitDraft = async (entry: DraftEntry) => {
+    setDraftSaving(true);
+    setDraftError(null);
+    try {
+      await fetchAction("submit_draft_timesheet", { timesheet_detail_id: entry.timesheetDetailId }, "POST");
+      await loadDrafts();
+    } catch (err) {
+      setDraftError(err instanceof Error ? err.message : "Failed to submit timesheet.");
+    } finally {
+      setDraftSaving(false);
+    }
+  };
+
   useEffect(() => {
     void load("kpi_cards", fromDate, toDate);
+    void loadDrafts();
   }, []);
 
   const kpiCards = dashboardPayload?.kpiCards || dashboardPayload?.summary?.kpiCards;
@@ -298,6 +506,40 @@ export function ReportsScreen() {
 
   return (
     <div className="screen-stack screen-stack--single report-dashboard">
+      <Panel>
+        <div className="panel-title-row">
+          <div>
+            <h2 className="panel-title">Drafts</h2>
+            <p className="panel-subtitle">Review stopped timers, edit times if needed, then submit.</p>
+          </div>
+          <div className="metric-icon warning-gradient">
+            <FileEdit size={18} />
+          </div>
+        </div>
+        {draftError ? (
+          <p className="panel-subtitle" style={{ color: "var(--danger)", marginBottom: "0.75rem", wordBreak: "break-word" }}>
+            {draftError}
+          </p>
+        ) : null}
+        {draftsLoading ? (
+          <LoadingState label="Loading drafts..." />
+        ) : (
+          <DraftsList
+            drafts={drafts}
+            onEdit={handleEdit}
+            onSubmit={handleSubmitDraft}
+            editingId={editingId}
+            editFrom={editFrom}
+            editTo={editTo}
+            onEditFromChange={setEditFrom}
+            onEditToChange={setEditTo}
+            onSaveEdit={() => void handleSaveEdit()}
+            onCancelEdit={() => setEditingId(null)}
+            saving={draftSaving}
+          />
+        )}
+      </Panel>
+
       <Panel>
         <div className="report-date-header">
           <h2 className="panel-title">My Reports</h2>

@@ -156,6 +156,27 @@ export type ActiveTimerKpi = {
   fromTime?: string | null;
 };
 
+export type DraftEntry = {
+  timesheetDetailId: string;
+  timesheetId: string;
+  task: string | null;
+  taskSubject: string | null;
+  customerId: string | null;
+  customerName: string | null;
+  project: string | null;
+  projectName: string | null;
+  activityType: string | null;
+  notes: string | null;
+  fromTime: string;
+  toTime: string;
+  hours: number;
+  canSubmit: boolean;
+};
+
+export type DraftsData = {
+  drafts: DraftEntry[];
+};
+
 export type KpiCardsData = {
   period: { fromDate: string; toDate: string };
   kpis: {

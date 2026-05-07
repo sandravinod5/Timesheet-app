@@ -1,4 +1,3 @@
-import { handleDemoAction } from "@/lib/demo-data";
 import { callErpNextMobileApp } from "@/lib/server/erpnext";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
@@ -85,7 +84,15 @@ async function handleRequest(request: NextRequest) {
   const sid = cookieStore.get("erpnext_sid")?.value;
 
   if (!process.env.ERPNEXT_BASE_URL) {
-    return NextResponse.json(normalizeKeys(handleDemoAction(action, params)));
+    return NextResponse.json(
+      {
+        success: false,
+        action,
+        data: null,
+        error: "ERPNEXT_BASE_URL is not configured."
+      },
+      { status: 500 }
+    );
   }
 
   try {
@@ -105,14 +112,15 @@ async function handleRequest(request: NextRequest) {
       });
     }
 
+    const errMsg = formatErrorMessage(error);
     return NextResponse.json(
       {
         success: false,
         action,
         data: null,
-        error: formatErrorMessage(error)
+        error: errMsg
       },
-      { status: 500 }
+      { status: errMsg ? 400 : 500 }
     );
   }
 }
