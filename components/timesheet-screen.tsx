@@ -14,21 +14,32 @@ export function TimesheetScreen() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [activityTypes, setActivityTypes] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [showTimerModal, setShowTimerModal] = useState(false);
 
   const load = async () => {
     setLoading(true);
-    const [timesheets, tasksPayload, activityTypesPayload] = await Promise.all([
-      fetchAction<TimesheetsData>("timesheets"),
-      fetchAction<{ tasks: Task[] }>("tasks"),
-      fetchAction<ActivityTypesData>("activity_types")
-    ]);
+    setError(null);
 
-    setPayload(timesheets.data);
-    setTasks(tasksPayload.data.tasks);
-    setActivityTypes(activityTypesPayload.data.activityTypes);
-    setLoading(false);
+    try {
+      const [timesheets, tasksPayload, activityTypesPayload] = await Promise.all([
+        fetchAction<TimesheetsData>("timesheets"),
+        fetchAction<{ tasks: Task[] }>("tasks"),
+        fetchAction<ActivityTypesData>("activity_types")
+      ]);
+
+      setPayload(timesheets.data);
+      setTasks(tasksPayload.data.tasks);
+      setActivityTypes(activityTypesPayload.data.activityTypes);
+    } catch (loadError) {
+      setPayload(null);
+      setTasks([]);
+      setActivityTypes([]);
+      setError(loadError instanceof Error ? loadError.message : "Timesheet data could not be loaded.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -65,7 +76,7 @@ export function TimesheetScreen() {
   }
 
   if (!payload) {
-    return <EmptyState title="Timesheets unavailable" copy="No timesheet data was returned from the API." />;
+    return <EmptyState title="Timesheets unavailable" copy={error || "No timesheet data was returned from the API."} />;
   }
 
   return (

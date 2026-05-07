@@ -50,6 +50,8 @@ export function OverviewScreen() {
   const [recent, setRecent] = useState<TimesheetsData | null>(null);
   const [activityTypes, setActivityTypes] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [recentError, setRecentError] = useState<string | null>(null);
   const [kpiType, setKpiType] = useState<string | null>(null);
   const [showTimerModal, setShowTimerModal] = useState(false);
   const [recentTimesheetsOpen, setRecentTimesheetsOpen] = useState(true);
@@ -58,17 +60,46 @@ export function OverviewScreen() {
 
   const load = async () => {
     setLoading(true);
-    const [overviewPayload, tasksPayload, timesheetsPayload, activityTypesPayload] = await Promise.all([
+    setError(null);
+    setRecentError(null);
+
+    const [overviewResult, tasksResult, timesheetsResult, activityTypesResult] = await Promise.allSettled([
       fetchAction<OverviewData>("overview"),
       fetchAction<{ tasks: Task[] }>("tasks"),
       fetchAction<TimesheetsData>("timesheets"),
       fetchAction<ActivityTypesData>("activity_types")
     ]);
 
-    setData(overviewPayload.data);
-    setTasks(tasksPayload.data.tasks);
-    setRecent(timesheetsPayload.data);
-    setActivityTypes(activityTypesPayload.data.activityTypes);
+    if (overviewResult.status === "fulfilled") {
+      setData(overviewResult.value.data);
+    } else {
+      setData(null);
+      setError(overviewResult.reason instanceof Error ? overviewResult.reason.message : "Overview could not be loaded.");
+    }
+
+    if (tasksResult.status === "fulfilled") {
+      setTasks(tasksResult.value.data.tasks);
+    } else {
+      setTasks([]);
+    }
+
+    if (timesheetsResult.status === "fulfilled") {
+      setRecent(timesheetsResult.value.data);
+    } else {
+      setRecent(null);
+      setRecentError(
+        timesheetsResult.reason instanceof Error
+          ? timesheetsResult.reason.message
+          : "Recent timesheets could not be loaded."
+      );
+    }
+
+    if (activityTypesResult.status === "fulfilled") {
+      setActivityTypes(activityTypesResult.value.data.activityTypes);
+    } else {
+      setActivityTypes([]);
+    }
+
     setLoading(false);
   };
 
@@ -129,7 +160,7 @@ export function OverviewScreen() {
   }
 
   if (!data) {
-    return <EmptyState title="Overview unavailable" copy="The dashboard data could not be loaded." />;
+    return <EmptyState title="Overview unavailable" copy={error || "The dashboard data could not be loaded."} />;
   }
 
   const timerRunning = Boolean(data.runningTimer);
@@ -303,7 +334,9 @@ export function OverviewScreen() {
 
           {recentTimesheetsOpen ? (
             <div className="list-stack collapsible-body">
-              {recentTimesheets.length === 0 ? (
+              {recentError ? (
+                <EmptyState title="Recent timesheets unavailable" copy={recentError} />
+              ) : recentTimesheets.length === 0 ? (
                 <EmptyState title="No recent timesheets" copy="There are no completed entries in this period yet." />
               ) : (
                 recentTimesheets.map((entry) => (
