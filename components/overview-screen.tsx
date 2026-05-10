@@ -349,7 +349,7 @@ export function OverviewScreen() {
             <div>
               <h2 className="panel-title">This Month</h2>
               <p className="panel-subtitle">
-                {formatHours(data.monthSummary.trackedHours)} tracked vs {formatHours(expectedHours)} expected at 7h/day
+                {formatPeriodLabel(data.period.fromDate, data.period.toDate)}
               </p>
             </div>
             <div className="metric-icon info-gradient">
@@ -357,41 +357,49 @@ export function OverviewScreen() {
             </div>
           </div>
 
-          <div className="metric-grid" style={{ gridTemplateColumns: "minmax(0, 1fr)", marginBottom: "1rem" }}>
+          <div className="metric-grid" style={{ marginBottom: "1rem" }}>
             <article className="metric-card">
               <div className="metric-top">
-                <span className="metric-label">Hours Summary</span>
+                <span className="metric-label">Tracked</span>
                 <span className="metric-icon primary-gradient">
-                  <Clock3 size={18} />
+                  <Clock3 size={14} />
                 </span>
               </div>
-              <div className="list-stack" style={{ gap: "0.75rem" }}>
-                <div className="muted-row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-                  <span>Actual</span>
-                  <span className="metric-value" style={{ fontSize: "1.45rem" }}>
-                    {formatHours(data.monthSummary.trackedHours)}
-                  </span>
-                </div>
-                <div className="muted-row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-                  <span>Expected</span>
-                  <span className="metric-value" style={{ fontSize: "1.45rem" }}>
-                    {formatHours(expectedHours)}
-                  </span>
-                </div>
-                {shortHours > 0 ? (
-                  <div className="muted-row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-                    <span>Short</span>
-                    <span className="metric-value" style={{ fontSize: "1.45rem", color: "var(--danger)" }}>
-                      {formatHours(shortHours)}
-                    </span>
-                  </div>
-                ) : null}
+              <span className="metric-value">{formatHours(data.monthSummary.trackedHours)}</span>
+            </article>
+            <article className="metric-card">
+              <div className="metric-top">
+                <span className="metric-label">Expected</span>
+                <span className="metric-icon info-gradient">
+                  <Target size={14} />
+                </span>
               </div>
+              <span className="metric-value">{formatHours(expectedHours)}</span>
             </article>
           </div>
 
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.5rem" }}>
+            <span className="metric-label">
+              {shortHours > 0 ? (
+                <span style={{ color: "var(--danger)", fontWeight: 700 }}>{formatHours(shortHours)} short</span>
+              ) : (
+                <span style={{ color: "var(--success)", fontWeight: 700 }}>On track</span>
+              )}
+            </span>
+            <span className="metric-label" style={{ fontVariantNumeric: "tabular-nums" }}>
+              {Math.round(trackedRatio)}%
+            </span>
+          </div>
           <div className="progress-track">
-            <div className="progress-fill" style={{ width: `${trackedRatio}%` }} />
+            <div
+              className="progress-fill"
+              style={{
+                width: `${trackedRatio}%`,
+                background: shortHours > 0
+                  ? "linear-gradient(90deg, var(--danger), #ff7a68)"
+                  : "linear-gradient(90deg, var(--primary), var(--accent))"
+              }}
+            />
           </div>
         </Panel>
 
