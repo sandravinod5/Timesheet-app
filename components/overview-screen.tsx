@@ -13,11 +13,13 @@ import {
 import { fetchAction } from "@/lib/client";
 import { showSystemNotification } from "@/lib/notifications";
 import type { ActivityTypesData, OverviewData, Task, TimesheetsData } from "@/lib/types";
-import { formatDuration, formatHours, statusBadgeClass } from "@/lib/utils";
+import { formatDuration, formatHours, formatWorkedTime, statusBadgeClass } from "@/lib/utils";
 import { EmptyState, LoadingState, OverviewSkeleton, Panel } from "@/components/ui";
 import { KpiModal } from "@/components/kpi-modal";
 import { useToast } from "@/components/toast-provider";
 import { TimerModal } from "@/components/timer-modal";
+
+const STANDARD_HOURS_PER_DAY = 7;
 
 function formatClockTime(value?: string | null) {
   if (!value) {
@@ -44,6 +46,26 @@ function formatPeriodLabel(fromDate?: string, toDate?: string) {
   }
 
   return `${fromDate} to ${toDate}`;
+}
+
+function getWorkingDays(fromDate?: string, toDate?: string) {
+  if (!fromDate || !toDate) {
+    return 0;
+  }
+
+  const current = new Date(`${fromDate}T00:00:00`);
+  const end = new Date(`${toDate}T00:00:00`);
+  let workingDays = 0;
+
+  while (current <= end) {
+    const day = current.getDay();
+    if (day !== 0 && day !== 6) {
+      workingDays += 1;
+    }
+    current.setDate(current.getDate() + 1);
+  }
+
+  return workingDays;
 }
 
 export function OverviewScreen() {
@@ -126,13 +148,30 @@ export function OverviewScreen() {
     return () => window.clearInterval(timer);
   }, [data?.runningTimer?.fromTime]);
 
-  const trackedRatio = useMemo(() => {
-    if (!data?.monthSummary.expectedHours) {
+  const expectedHours = useMemo(() => {
+    if (!data) {
       return 0;
     }
 
-    return Math.min(100, (data.monthSummary.trackedHours / data.monthSummary.expectedHours) * 100);
+    const calculated = getWorkingDays(data.period.fromDate, data.period.toDate) * STANDARD_HOURS_PER_DAY;
+    return calculated || data.monthSummary.expectedHours || 0;
   }, [data]);
+
+  const shortHours = useMemo(() => {
+    if (!data) {
+      return 0;
+    }
+
+    return Math.max(0, Number((expectedHours - data.monthSummary.trackedHours).toFixed(2)));
+  }, [data, expectedHours]);
+
+  const trackedRatio = useMemo(() => {
+    if (!data || !expectedHours) {
+      return 0;
+    }
+
+    return Math.min(100, (data.monthSummary.trackedHours / expectedHours) * 100);
+  }, [data, expectedHours]);
 
   const recentTimesheets = useMemo(() => {
     return recent?.timesheets?.filter((item) => !item.isRunning).slice(0, 5) ?? [];
@@ -142,7 +181,18 @@ export function OverviewScreen() {
     return data?.recentClientVisits ?? [];
   }, [data]);
 
-  const startTimer = async (taskId: string, activityType: string) => {
+  const startTimer = async (task: Task, activityType: string) => {
+    const taskId = task?.taskId?.trim();
+
+    if (!taskId) {
+      showToast({
+        title: "Unable to start timer",
+        message: "No task was selected. Please choose a task and try again.",
+        variant: "error"
+      });
+      return;
+    }
+
     try {
       await fetchAction("start_timer", { task: taskId, activity_type: activityType }, "POST");
       setShowTimerModal(false);
@@ -299,7 +349,7 @@ export function OverviewScreen() {
             <div>
               <h2 className="panel-title">This Month</h2>
               <p className="panel-subtitle">
-                {formatHours(data.monthSummary.trackedHours)} tracked vs {formatHours(data.monthSummary.expectedHours)} expected at 8h/day
+                {formatHours(data.monthSummary.trackedHours)} tracked vs {formatHours(expectedHours)} expected at 7h/day
               </p>
             </div>
             <div className="metric-icon info-gradient">
@@ -307,25 +357,36 @@ export function OverviewScreen() {
             </div>
           </div>
 
-          <div className="metric-grid" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))", marginBottom: "1rem" }}>
+          <div className="metric-grid" style={{ gridTemplateColumns: "minmax(0, 1fr)", marginBottom: "1rem" }}>
             <article className="metric-card">
               <div className="metric-top">
-                <span className="metric-label">Tracked Hours</span>
+                <span className="metric-label">Hours Summary</span>
                 <span className="metric-icon primary-gradient">
                   <Clock3 size={18} />
                 </span>
               </div>
-              <span className="metric-value">{formatHours(data.monthSummary.trackedHours)}</span>
-            </article>
-
-            <article className="metric-card">
-              <div className="metric-top">
-                <span className="metric-label">Expected Hours (8h/day)</span>
-                <span className="metric-icon success-gradient">
-                  <Target size={18} />
-                </span>
+              <div className="list-stack" style={{ gap: "0.75rem" }}>
+                <div className="muted-row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+                  <span>Actual</span>
+                  <span className="metric-value" style={{ fontSize: "1.45rem" }}>
+                    {formatHours(data.monthSummary.trackedHours)}
+                  </span>
+                </div>
+                <div className="muted-row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+                  <span>Expected</span>
+                  <span className="metric-value" style={{ fontSize: "1.45rem" }}>
+                    {formatHours(expectedHours)}
+                  </span>
+                </div>
+                {shortHours > 0 ? (
+                  <div className="muted-row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+                    <span>Short</span>
+                    <span className="metric-value" style={{ fontSize: "1.45rem", color: "var(--danger)" }}>
+                      {formatHours(shortHours)}
+                    </span>
+                  </div>
+                ) : null}
               </div>
-              <span className="metric-value">{formatHours(data.monthSummary.expectedHours)}</span>
             </article>
           </div>
 
@@ -394,7 +455,7 @@ export function OverviewScreen() {
                         <p className="panel-subtitle">{entry.customerName || "No customer"}</p>
                       </div>
                       <span className={`badge ${statusBadgeClass("Completed", 0)}`}>
-                        {formatHours(entry.hours)}
+                        {formatWorkedTime(entry.hours)}
                       </span>
                     </div>
                     <div className="muted-row time-range-row" style={{ marginTop: "0.7rem" }}>
@@ -438,7 +499,7 @@ export function OverviewScreen() {
                         <h4 className="list-title">{entry.customerName || entry.taskSubject || "Client Visit"}</h4>
                         <p className="panel-subtitle">{entry.taskSubject || "Visit activity"}</p>
                       </div>
-                      <span className="badge badge-progress">{formatHours(entry.hours)}</span>
+                      <span className="badge badge-progress">{formatWorkedTime(entry.hours)}</span>
                     </div>
                     <div className="muted-row list-meta-wrap" style={{ marginTop: "0.7rem" }}>
                       <span>{entry.projectName || "No project"}</span>

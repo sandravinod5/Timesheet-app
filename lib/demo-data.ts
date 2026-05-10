@@ -137,7 +137,7 @@ let runningTimer: RunningTimer | null = {
   isRunning: true
 };
 
-const STANDARD_HOURS_PER_DAY = 8;
+const STANDARD_HOURS_PER_DAY = 7;
 
 function isoNowText() {
   return new Date().toISOString().slice(0, 19).replace("T", " ");
@@ -472,9 +472,9 @@ function getKpiCards(): KpiCardsData {
         value: tracked,
         label: "Hours Logged",
         color: "purple",
-        subLabel: `of ${expected} expected at 8h/day`,
+        subLabel: `of ${expected} expected at 7h/day`,
         delta,
-        deltaLabel: `${delta >= 0 ? "+" : ""}${delta}h vs 8h/day standard`
+        deltaLabel: `${delta >= 0 ? "+" : ""}${delta}h vs 7h/day standard`
       },
       visitCount: {
         value: 3,
