@@ -5,22 +5,55 @@ import { useEffect, useMemo, useState } from "react";
 import { fetchAction } from "@/lib/client";
 import { requestNotificationPermission, shouldSendNotification, showSystemNotification, getNotificationPermissionState } from "@/lib/notifications";
 import type { ActivityTypesData, DraftEntry, DraftsData, Task, TimesheetsData } from "@/lib/types";
-import { formatHours } from "@/lib/utils";
+import { formatHours, formatWorkedTime } from "@/lib/utils";
 import { Button, EmptyState, InputShell, LoadingState, Panel } from "@/components/ui";
 import { useToast } from "@/components/toast-provider";
 import { TimerModal } from "@/components/timer-modal";
 
 function toDateTimeLocal(value: string) {
-  return value.replace(" ", "T").slice(0, 16);
+  const parsed = parseErpDateTime(value);
+  if (!parsed) {
+    return value.replace(" ", "T").slice(0, 16);
+  }
+
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const day = String(parsed.getDate()).padStart(2, "0");
+  const hour = String(parsed.getHours()).padStart(2, "0");
+  const minute = String(parsed.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day}T${hour}:${minute}`;
 }
 
 function fromDateTimeLocal(value: string) {
   return value.replace("T", " ") + ":00";
 }
 
+function parseErpDateTime(value: string) {
+  const match = value.match(
+    /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?(?:\.(\d+))?$/
+  );
+
+  if (!match) {
+    const fallback = new Date(value.includes("T") ? value : value.replace(" ", "T"));
+    return Number.isNaN(fallback.getTime()) ? null : fallback;
+  }
+
+  const [, year, month, day, hour, minute, second = "0", fraction = "0"] = match;
+  const milliseconds = Number(fraction.slice(0, 3).padEnd(3, "0"));
+  return new Date(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hour),
+    Number(minute),
+    Number(second),
+    milliseconds
+  );
+}
+
 function formatEntryTime(value: string) {
-  const parsed = new Date(value.includes("T") ? value : value.replace(" ", "T"));
-  if (Number.isNaN(parsed.getTime())) return value;
+  const parsed = parseErpDateTime(value);
+  if (!parsed) return value;
   return parsed.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
@@ -64,7 +97,7 @@ function DraftEntriesList({
                 <h3 className="list-title">{entry.taskSubject || "No task"}</h3>
                 <p className="panel-subtitle">{entry.customerName || "No customer"}</p>
               </div>
-              <span className="badge badge-complete">{formatHours(entry.hours)}</span>
+              <span className="badge badge-complete">{formatWorkedTime(entry.hours)}</span>
             </div>
             <p className="list-description task-supporting-copy">{entry.projectName || entry.activityType || "No project"}</p>
 
@@ -290,7 +323,18 @@ export function TimesheetScreen() {
     );
   }, [payload?.timesheets, search]);
 
-  const startTimer = async (taskId: string, activityType: string) => {
+  const startTimer = async (task: Task, activityType: string) => {
+    const taskId = task?.taskId?.trim();
+
+    if (!taskId) {
+      showToast({
+        title: "Unable to start timer",
+        message: "No task was selected. Please choose a task and try again.",
+        variant: "error"
+      });
+      return;
+    }
+
     try {
       await fetchAction("start_timer", { task: taskId, activity_type: activityType }, "POST");
       setShowTimerModal(false);
@@ -612,7 +656,7 @@ export function TimesheetScreen() {
                             <p className="panel-subtitle">{entry.customerName || "No customer"}</p>
                           </div>
                           <span className={`badge ${entry.isRunning ? "badge-progress" : "badge-complete"}`}>
-                            {entry.isRunning ? "Running" : formatHours(entry.hours)}
+                            {entry.isRunning ? "Running" : formatWorkedTime(entry.hours)}
                           </span>
                         </div>
                         <p className="list-description task-supporting-copy">{entry.projectName || "No project"}</p>

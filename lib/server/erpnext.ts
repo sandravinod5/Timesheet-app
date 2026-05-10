@@ -70,6 +70,37 @@ function getCookieSid(setCookieHeader: string | null) {
   return match?.[1];
 }
 
+async function fetchErpNextUserFullName(email: string, sid?: string) {
+  if (!baseUrl || !sid) {
+    return null;
+  }
+
+  try {
+    const response = await fetch(`${baseUrl}/api/resource/User/${encodeURIComponent(email)}`, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        Cookie: `sid=${sid}; system_user=yes`
+      },
+      cache: "no-store"
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const payload = (await response.json().catch(() => ({}))) as {
+      data?: {
+        full_name?: string;
+      };
+    };
+
+    return payload.data?.full_name?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
 export async function loginToErpNext(email: string, password: string): Promise<SessionData> {
   if (!baseUrl) {
     return {
@@ -99,6 +130,7 @@ export async function loginToErpNext(email: string, password: string): Promise<S
   }
 
   const sid = getCookieSid(response.headers.get("set-cookie"));
+  const displayName = (await fetchErpNextUserFullName(email, sid)) || getDisplayName(email);
 
   if (!sid && !(apiKey && apiSecret)) {
     throw new Error("ERPNext login succeeded but no session cookie was returned.");
@@ -107,7 +139,7 @@ export async function loginToErpNext(email: string, password: string): Promise<S
   return {
     user: {
       email,
-      displayName: getDisplayName(email)
+      displayName
     },
     sid
   };

@@ -12,7 +12,46 @@ export function formatDuration(totalSeconds: number) {
 }
 
 export function formatHours(value: number) {
+  if (!Number.isFinite(value)) {
+    return "0h";
+  }
+
+  const absolute = Math.abs(value);
+
+  if (absolute === 0) {
+    return "0h";
+  }
+
+  if (absolute < 1) {
+    return `${value.toFixed(2)}h`;
+  }
+
   return `${value.toFixed(1)}h`;
+}
+
+export function formatWorkedTime(value: number) {
+  if (!Number.isFinite(value) || value <= 0) {
+    return "0s";
+  }
+
+  const totalSeconds = Math.max(1, Math.round(value * 3600));
+  if (totalSeconds < 60) {
+    return `${totalSeconds}s`;
+  }
+
+  const totalMinutes = Math.round(totalSeconds / 60);
+  if (totalMinutes < 60) {
+    return `${totalMinutes}m`;
+  }
+
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (minutes === 0) {
+    return `${hours}h`;
+  }
+
+  return `${hours}h ${minutes}m`;
 }
 
 export function statusBadgeClass(status: string, isOverdue?: number) {

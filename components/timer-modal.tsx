@@ -17,7 +17,7 @@ export function TimerModal({
   tasks: Task[];
   activityTypes: string[];
   onClose: () => void;
-  onStart: (taskId: string, activityType: string) => Promise<void>;
+  onStart: (task: Task, activityType: string) => Promise<void>;
 }) {
   const [search, setSearch] = useState("");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -67,7 +67,8 @@ export function TimerModal({
               key={type}
               className="list-card"
               style={{ textAlign: "left" }}
-              onClick={() => void onStart(selectedTask.taskId, type)}
+              type="button"
+              onClick={() => void onStart(selectedTask, type)}
             >
               <div className="list-head">
                 <h4 className="list-title">{type}</h4>
@@ -99,6 +100,7 @@ export function TimerModal({
               key={task.taskId}
               className="list-card timer-task-card"
               style={{ textAlign: "left" }}
+              type="button"
               onClick={() => setSelectedTask(task)}
             >
               <div className="list-head">

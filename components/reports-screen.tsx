@@ -189,6 +189,35 @@ function TaskStatusChart({ kpis }: { kpis: KpiCardsData["kpis"] }) {
   );
 }
 
+function TaskStatusChartLoading() {
+  return (
+    <div className="report-status-chart report-status-chart--loading" aria-hidden="true">
+      <div className="report-status-ring report-status-ring--loading">
+        <div className="report-status-ring-inner report-status-ring-inner--loading">
+          <div className="report-status-loading-core" />
+        </div>
+      </div>
+      <div className="report-status-legend">
+        <div className="report-status-row report-status-row--loading">
+          <span className="report-status-dot skeleton-block" />
+          <span className="report-status-loading-line" />
+          <span className="report-status-loading-value" />
+        </div>
+        <div className="report-status-row report-status-row--loading">
+          <span className="report-status-dot skeleton-block" />
+          <span className="report-status-loading-line" />
+          <span className="report-status-loading-value" />
+        </div>
+        <div className="report-status-row report-status-row--loading">
+          <span className="report-status-dot skeleton-block" />
+          <span className="report-status-loading-line" />
+          <span className="report-status-loading-value" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function normalizeHoursByDay(rows?: Array<Record<string, string | number | boolean | null>>): HoursByDay[] {
   return (rows || []).map((row) => ({
     date: String(row.date || row.work_date || ""),
@@ -287,7 +316,7 @@ export function ReportsScreen() {
   );
   const activeTimerRow = detailPayload?.rows?.[0] || null;
 
-  if (loading) {
+  if (loading && !dashboardPayload) {
     return <LoadingState label="Loading my insights..." />;
   }
 
@@ -430,7 +459,7 @@ export function ReportsScreen() {
             <HoursChart rows={hoursByDay} />
           </article>
 
-          {kpiCards ? (
+          {kpiCards || loading ? (
             <article className="report-detail-card">
               <div className="report-detail-head">
                 <div>
@@ -439,10 +468,10 @@ export function ReportsScreen() {
                 </div>
                 <span className="report-pill">
                   <BarChart3 size={14} />
-                  <span>{kpiCards.tasksCompleted.value + kpiCards.tasksInProgress.value + kpiCards.tasksPending.value + kpiCards.tasksOverdue.value}</span>
+                  <span>{kpiCards ? kpiCards.tasksCompleted.value + kpiCards.tasksInProgress.value + kpiCards.tasksPending.value + kpiCards.tasksOverdue.value : "..."}</span>
                 </span>
               </div>
-              <TaskStatusChart kpis={kpiCards} />
+              {loading || !kpiCards ? <TaskStatusChartLoading /> : <TaskStatusChart kpis={kpiCards} />}
             </article>
           ) : null}
 
