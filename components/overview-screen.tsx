@@ -222,13 +222,19 @@ export function OverviewScreen() {
 
   const stopTimer = async () => {
     try {
-      await fetchAction("stop_timer", undefined, "POST");
+      const response = await fetchAction<{
+        message?: string;
+        runningTimer?: { timesheetDetailId?: string } | null;
+      }>("stop_timer");
+
+      const stillRunning = Boolean(response.data?.runningTimer);
       showToast({
-        title: "Timer stopped",
-        message: "Saved to draft entries."
+        title: stillRunning ? "Another timer is still active" : "Timer stopped",
+        message: response.data?.message || "Saved to draft entries.",
+        variant: stillRunning ? "error" : undefined
       });
 
-      if (document.visibilityState === "hidden") {
+      if (!stillRunning && document.visibilityState === "hidden") {
         await showSystemNotification({
           title: "Timer stopped",
           body: "The timer was saved to your draft entries.",

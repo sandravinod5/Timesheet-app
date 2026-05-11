@@ -193,16 +193,22 @@ export async function logoutFromErpNext(sid?: string) {
     return;
   }
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 1500);
+
   try {
     await fetch(`${baseUrl}/api/method/logout`, {
       method: "GET",
       headers: {
         Cookie: `sid=${sid}; system_user=yes`
       },
-      cache: "no-store"
+      cache: "no-store",
+      signal: controller.signal
     });
   } catch {
     return;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
