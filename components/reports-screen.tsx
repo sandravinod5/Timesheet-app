@@ -11,7 +11,7 @@ import {
 import { useEffect, useState } from "react";
 import { fetchAction } from "@/lib/client";
 import type { HoursByDay, KpiCardsData, ReportsData, VisitByCustomer } from "@/lib/types";
-import { formatHours } from "@/lib/utils";
+import { formatDuration, formatHours } from "@/lib/utils";
 import { EmptyState, LoadingState, Panel } from "@/components/ui";
 
 function todayStr() {
@@ -277,6 +277,7 @@ export function ReportsScreen() {
   const [toDate, setToDate] = useState(todayStr());
   const [pendingFrom, setPendingFrom] = useState(firstOfMonthStr());
   const [pendingTo, setPendingTo] = useState(todayStr());
+  const [timerElapsed, setTimerElapsed] = useState(0);
 
   const load = async (reportKey: string = "kpi_cards", from?: string, to?: string) => {
     setLoading(true);
@@ -306,7 +307,33 @@ export function ReportsScreen() {
     void load("kpi_cards", fromDate, toDate);
   }, []);
 
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        void load("kpi_cards", fromDate, toDate);
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [fromDate, toDate]);
+
   const kpiCards = dashboardPayload?.kpiCards || dashboardPayload?.summary?.kpiCards;
+
+  useEffect(() => {
+    const fromTime = kpiCards?.activeTimer?.fromTime;
+    if (!fromTime) {
+      setTimerElapsed(0);
+      return;
+    }
+
+    const run = () => {
+      const start = new Date(fromTime.includes("T") ? fromTime : fromTime.replace(" ", "T")).getTime();
+      setTimerElapsed(Math.max(0, Math.floor((Date.now() - start) / 1000)));
+    };
+    run();
+    const interval = window.setInterval(run, 1000);
+    return () => window.clearInterval(interval);
+  }, [kpiCards?.activeTimer?.fromTime]);
   const hoursByDay =
     dashboardPayload?.hoursByDay ||
     dashboardPayload?.summary?.hoursByDay ||
@@ -483,13 +510,13 @@ export function ReportsScreen() {
               </div>
               <span className="report-pill">
                 <TimerReset size={14} />
-                <span>{kpiCards?.activeTimer.isRunning ? "Running" : "Idle"}</span>
+                <span>{kpiCards?.activeTimer?.isRunning ? "Running" : "Idle"}</span>
               </span>
             </div>
 
-            {kpiCards?.activeTimer.isRunning ? (
+            {kpiCards?.activeTimer?.isRunning ? (
               <div className="report-active-timer">
-                <div className="report-active-value">{formatHours(kpiCards.activeTimer.liveHours)}</div>
+                <div className="report-active-value">{formatDuration(timerElapsed)}</div>
                 <p className="report-active-copy">{kpiCards.activeTimer.taskSubject || "No task selected"}</p>
                 <p className="report-active-meta">
                   {kpiCards.activeTimer.customerName || "No customer"}

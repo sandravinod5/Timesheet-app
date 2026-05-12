@@ -1,0 +1,603 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import {
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  Clock3,
+  MapPinned,
+  Sparkles
+} from "lucide-react";
+import { fetchAction } from "@/lib/client";
+import type { Task, TimesheetsData } from "@/lib/types";
+import { formatWorkedTime, statusBadgeClass } from "@/lib/utils";
+import { EmptyState, LoadingState, Panel } from "@/components/ui";
+
+type VisitItem = {
+  key: string;
+  kind: "scheduled" | "completed" | "running";
+  date: string;
+  taskId: string;
+  subject: string;
+  customerName: string;
+  projectName: string;
+  rawStatus?: string | null;
+  displayStatus: string;
+  activityType?: string | null;
+  fromTime?: string | null;
+  toTime?: string | null;
+  hours?: number;
+};
+
+const VISIT_PROJECT_TYPES = ["client visit strategy", "partners client visit strategy"];
+const WEEK_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function pad(value: number) {
+  return String(value).padStart(2, "0");
+}
+
+function dateKey(date: Date) {
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+function firstOfMonth(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function endOfMonth(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0);
+}
+
+function shiftMonth(date: Date, amount: number) {
+  return new Date(date.getFullYear(), date.getMonth() + amount, 1);
+}
+
+function extractDate(value?: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  const match = String(value).match(/\d{4}-\d{2}-\d{2}/);
+  return match ? match[0] : null;
+}
+
+function compactVisitLabel(item: VisitItem) {
+  const source = item.customerName || item.subject || "Visit";
+  const normalized = source.replace(/\s+/g, " ").trim();
+  if (normalized.length <= 14) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, 12).trim()}..`;
+}
+
+function formatMonthLabel(date: Date) {
+  return date.toLocaleDateString(undefined, {
+    month: "long",
+    year: "numeric"
+  });
+}
+
+function formatDayLabel(value: string) {
+  const date = new Date(`${value}T00:00:00`);
+  return date.toLocaleDateString(undefined, {
+    weekday: "long",
+    day: "numeric",
+    month: "long"
+  });
+}
+
+function formatTimeLabel(value?: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = value.includes("T") ? value : value.replace(" ", "T");
+  const parsed = new Date(normalized);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  return parsed.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function isVisitProjectType(value?: string | null) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+
+  return VISIT_PROJECT_TYPES.some((item) => normalized.includes(item));
+}
+
+function isVisitText(value?: string | null) {
+  return String(value || "").toLowerCase().includes("visit");
+}
+
+function isVisitTask(task: Task) {
+  return isVisitProjectType(task.customProjectType);
+}
+
+function buildCalendarDays(monthCursor: Date) {
+  const first = firstOfMonth(monthCursor);
+  const last = endOfMonth(monthCursor);
+  const days: Array<{ key: string; dayNumber: number; inMonth: boolean }> = [];
+
+  for (let i = 0; i < first.getDay(); i += 1) {
+    days.push({ key: `empty-start-${i}`, dayNumber: 0, inMonth: false });
+  }
+
+  for (let day = 1; day <= last.getDate(); day += 1) {
+    const current = new Date(monthCursor.getFullYear(), monthCursor.getMonth(), day);
+    days.push({ key: dateKey(current), dayNumber: day, inMonth: true });
+  }
+
+  while (days.length % 7 !== 0) {
+    days.push({ key: `empty-end-${days.length}`, dayNumber: 0, inMonth: false });
+  }
+
+  return days;
+}
+
+function addVisit(map: Record<string, VisitItem[]>, item: VisitItem) {
+  if (!map[item.date]) {
+    map[item.date] = [];
+  }
+
+  map[item.date].push(item);
+}
+
+export function VisitsScreen() {
+  const [monthCursor, setMonthCursor] = useState(firstOfMonth(new Date()));
+  const [selectedDate, setSelectedDate] = useState(dateKey(new Date()));
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [timesheetData, setTimesheetData] = useState<TimesheetsData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+
+      const fromDate = dateKey(firstOfMonth(monthCursor));
+      const toDate = dateKey(endOfMonth(monthCursor));
+
+      const [tasksResult, timesheetsResult] = await Promise.allSettled([
+        fetchAction<{ tasks: Task[] }>("tasks"),
+        fetchAction<TimesheetsData>("timesheets", {
+          from_date: fromDate,
+          to_date: toDate
+        })
+      ]);
+
+      if (tasksResult.status === "fulfilled") {
+        setTasks(tasksResult.value.data.tasks);
+      } else {
+        setTasks([]);
+        setError(tasksResult.reason instanceof Error ? tasksResult.reason.message : "Tasks could not be loaded.");
+      }
+
+      if (timesheetsResult.status === "fulfilled") {
+        setTimesheetData(timesheetsResult.value.data);
+      } else {
+        setTimesheetData(null);
+        setError(
+          timesheetsResult.reason instanceof Error
+            ? timesheetsResult.reason.message
+            : "Visit timesheets could not be loaded."
+        );
+      }
+
+      setLoading(false);
+    };
+
+    void load();
+  }, [monthCursor]);
+
+  const visitTaskMap = useMemo(() => {
+    const mapped = new Map<string, Task>();
+    tasks.filter(isVisitTask).forEach((task) => {
+      mapped.set(task.taskId, task);
+    });
+    return mapped;
+  }, [tasks]);
+
+  const visitData = useMemo(() => {
+    const byDate: Record<string, VisitItem[]> = {};
+    const completedTaskDates = new Set<string>();
+    const runningTaskDates = new Set<string>();
+    const aggregatedVisits = new Map<string, VisitItem>();
+    const selectedMonthKey = `${monthCursor.getFullYear()}-${pad(monthCursor.getMonth() + 1)}`;
+
+    const timesheets = timesheetData?.timesheets ?? [];
+    for (const entry of timesheets) {
+      const relatedTask = entry.task ? visitTaskMap.get(entry.task) : undefined;
+      if (!relatedTask && !isVisitText(entry.activityType) && !isVisitText(entry.taskSubject)) {
+        continue;
+      }
+
+      const visitDate = extractDate(entry.fromTime);
+      if (!visitDate) {
+        continue;
+      }
+
+      const taskId = entry.task || relatedTask?.taskId || entry.timesheetDetailId;
+      const kind: VisitItem["kind"] = entry.isRunning ? "running" : "completed";
+      const aggregateKey = `${kind}|${taskId}|${visitDate}`;
+      const existing = aggregatedVisits.get(aggregateKey);
+
+      if (existing) {
+        existing.hours = Number(((existing.hours || 0) + (entry.hours || 0)).toFixed(2));
+
+        const existingFrom = existing.fromTime ? new Date(existing.fromTime).getTime() : Number.POSITIVE_INFINITY;
+        const nextFrom = entry.fromTime ? new Date(entry.fromTime).getTime() : Number.POSITIVE_INFINITY;
+        if (nextFrom < existingFrom) {
+          existing.fromTime = entry.fromTime;
+        }
+
+        const existingTo = existing.toTime ? new Date(existing.toTime).getTime() : Number.NEGATIVE_INFINITY;
+        const nextTo = entry.toTime ? new Date(entry.toTime).getTime() : Number.NEGATIVE_INFINITY;
+        if (nextTo > existingTo) {
+          existing.toTime = entry.toTime;
+        }
+
+        if (!existing.activityType && entry.activityType) {
+          existing.activityType = entry.activityType;
+        }
+      } else {
+        aggregatedVisits.set(aggregateKey, {
+          key: `${taskId}-${visitDate}-${kind}`,
+          kind,
+          date: visitDate,
+          taskId,
+          subject: entry.taskSubject || relatedTask?.subject || "Visit task",
+          customerName: entry.customerName || relatedTask?.customerName || "No customer",
+          projectName: entry.projectName || relatedTask?.projectName || "No project",
+          rawStatus: relatedTask?.rawStatus,
+          displayStatus: entry.isRunning ? "Running" : "Visited",
+          activityType: entry.activityType,
+          fromTime: entry.fromTime,
+          toTime: entry.toTime,
+          hours: entry.hours
+        });
+      }
+
+      if (entry.isRunning) {
+        runningTaskDates.add(`${taskId}|${visitDate}`);
+      } else {
+        completedTaskDates.add(`${taskId}|${visitDate}`);
+      }
+    }
+
+    aggregatedVisits.forEach((item) => {
+      addVisit(byDate, item);
+    });
+
+    for (const task of visitTaskMap.values()) {
+      const scheduledDate = extractDate(task.expEndDate);
+      if (!scheduledDate || !scheduledDate.startsWith(selectedMonthKey)) {
+        continue;
+      }
+
+      if (["Completed", "Closed"].includes(task.status)) {
+        continue;
+      }
+
+      const recordedKey = `${task.taskId}|${scheduledDate}`;
+      if (completedTaskDates.has(recordedKey) || runningTaskDates.has(recordedKey)) {
+        continue;
+      }
+
+      const isScheduledStatus = String(task.rawStatus || "").toLowerCase() === "scheduled";
+      const item: VisitItem = {
+        key: `scheduled-${task.taskId}-${scheduledDate}`,
+        kind: "scheduled",
+        date: scheduledDate,
+        taskId: task.taskId,
+        subject: task.subject,
+        customerName: task.customerName || "No customer",
+        projectName: task.projectName || "No project",
+        rawStatus: task.rawStatus,
+        displayStatus: isScheduledStatus ? "Scheduled" : task.status,
+      };
+
+      addVisit(byDate, item);
+    }
+
+    Object.values(byDate).forEach((items) => {
+      items.sort((left, right) => {
+        const order = { running: 0, scheduled: 1, completed: 2 };
+        if (order[left.kind] !== order[right.kind]) {
+          return order[left.kind] - order[right.kind];
+        }
+
+        return left.subject.localeCompare(right.subject);
+      });
+    });
+
+    return byDate;
+  }, [monthCursor, timesheetData, visitTaskMap]);
+
+  const calendarDays = useMemo(() => buildCalendarDays(monthCursor), [monthCursor]);
+
+  const monthStats = useMemo(() => {
+    const stats = {
+      scheduled: 0,
+      completed: 0,
+      running: 0
+    };
+
+    Object.values(visitData).forEach((items) => {
+      items.forEach((item) => {
+        stats[item.kind] += 1;
+      });
+    });
+
+    return stats;
+  }, [visitData]);
+
+  useEffect(() => {
+    const todayKey = dateKey(new Date());
+    const monthPrefix = `${monthCursor.getFullYear()}-${pad(monthCursor.getMonth() + 1)}`;
+    const datesWithVisits = Object.keys(visitData).filter((item) => item.startsWith(monthPrefix)).sort();
+
+    if (selectedDate.startsWith(monthPrefix)) {
+      return;
+    }
+
+    if (todayKey.startsWith(monthPrefix)) {
+      setSelectedDate(todayKey);
+      return;
+    }
+
+    setSelectedDate(datesWithVisits[0] || `${monthPrefix}-01`);
+  }, [monthCursor, selectedDate, visitData]);
+
+  const selectedItems = visitData[selectedDate] || [];
+  const runningItems = selectedItems.filter((item) => item.kind === "running");
+  const scheduledItems = selectedItems.filter((item) => item.kind === "scheduled");
+  const completedItems = selectedItems.filter((item) => item.kind === "completed");
+
+  if (loading && !timesheetData && tasks.length === 0) {
+    return <LoadingState label="Loading visits..." />;
+  }
+
+  if (error && !timesheetData && tasks.length === 0) {
+    return <EmptyState title="Visits unavailable" copy={error} />;
+  }
+
+  return (
+    <div className="screen-stack screen-stack--single">
+      <Panel className="visit-hero-panel">
+        <div className="visit-hero">
+          <div>
+            <div className="visit-hero-kicker">
+              <Sparkles size={14} />
+              <span>Visit planner</span>
+            </div>
+            <h2 className="panel-title visit-hero-title">Client Visits Calendar</h2>
+            <p className="panel-subtitle visit-hero-copy">
+              Track scheduled visits, completed visits, and live visit timers by date.
+            </p>
+          </div>
+          <div className="visit-hero-icon">
+            <CalendarDays size={22} />
+          </div>
+        </div>
+
+        <div className="visit-hero-stats">
+          <article className="visit-stat-card visit-stat-card--scheduled">
+            <span className="visit-stat-label">Scheduled</span>
+            <span className="visit-stat-value">{monthStats.scheduled}</span>
+          </article>
+          <article className="visit-stat-card visit-stat-card--completed">
+            <span className="visit-stat-label">Visited</span>
+            <span className="visit-stat-value">{monthStats.completed}</span>
+          </article>
+          <article className="visit-stat-card visit-stat-card--running">
+            <span className="visit-stat-label">Running</span>
+            <span className="visit-stat-value">{monthStats.running}</span>
+          </article>
+        </div>
+      </Panel>
+
+      <Panel className="visit-calendar-panel">
+        <div className="visit-calendar-toolbar">
+          <button
+            type="button"
+            className="ghost-button"
+            onClick={() => setMonthCursor((current) => shiftMonth(current, -1))}
+            aria-label="Previous month"
+          >
+            <ChevronLeft size={18} />
+          </button>
+          <div className="visit-calendar-month">
+            <h3 className="visit-calendar-title">{formatMonthLabel(monthCursor)}</h3>
+            <p className="panel-subtitle">Tap a day to see gone visits and scheduled visits.</p>
+          </div>
+          <button
+            type="button"
+            className="ghost-button"
+            onClick={() => setMonthCursor((current) => shiftMonth(current, 1))}
+            aria-label="Next month"
+          >
+            <ChevronRight size={18} />
+          </button>
+        </div>
+
+        <div className="visit-calendar-legend">
+          <span><i className="visit-dot visit-dot--scheduled" /> Scheduled</span>
+          <span><i className="visit-dot visit-dot--completed" /> Visited</span>
+          <span><i className="visit-dot visit-dot--running" /> Running</span>
+        </div>
+
+        <div className="visit-calendar-grid">
+          {WEEK_DAYS.map((day) => (
+            <div key={day} className="visit-calendar-weekday">
+              {day}
+            </div>
+          ))}
+
+          {calendarDays.map((day, index) => {
+            if (!day.inMonth) {
+              return <div key={day.key} className="visit-day visit-day--empty" />;
+            }
+
+            const items = visitData[day.key] || [];
+            const scheduledCount = items.filter((item) => item.kind === "scheduled").length;
+            const completedCount = items.filter((item) => item.kind === "completed").length;
+            const runningCount = items.filter((item) => item.kind === "running").length;
+            const labels = Array.from(new Set(items.map((item) => compactVisitLabel(item)).filter(Boolean))).slice(0, 1);
+            const extraCount = Math.max(0, items.length - 1);
+            const isSelected = selectedDate === day.key;
+            const isToday = day.key === dateKey(new Date());
+
+            return (
+              <button
+                key={day.key}
+                type="button"
+                className={[
+                  "visit-day",
+                  isSelected ? "is-selected" : "",
+                  isToday ? "is-today" : "",
+                  items.length > 0 ? "has-visits" : ""
+                ].filter(Boolean).join(" ")}
+                style={{ animationDelay: `${index * 18}ms` }}
+                onClick={() => setSelectedDate(day.key)}
+              >
+                <span className="visit-day-number">{day.dayNumber}</span>
+                <div className="visit-day-labels">
+                  {labels.map((label) => (
+                    <span key={`${day.key}-${label}`} className="visit-day-label" title={label}>
+                      {label}
+                    </span>
+                  ))}
+                  {extraCount > 0 ? (
+                    <span className="visit-day-label visit-day-label--more">+{extraCount}</span>
+                  ) : null}
+                </div>
+                <div className="visit-day-indicators">
+                  {scheduledCount > 0 ? <span className="visit-day-pill visit-day-pill--scheduled">{scheduledCount}</span> : null}
+                  {completedCount > 0 ? <span className="visit-day-pill visit-day-pill--completed">{completedCount}</span> : null}
+                  {runningCount > 0 ? <span className="visit-day-pill visit-day-pill--running">{runningCount}</span> : null}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </Panel>
+
+      <Panel className="visit-detail-panel">
+        <div className="visit-detail-head">
+          <div>
+            <h3 className="panel-title">{formatDayLabel(selectedDate)}</h3>
+            <p className="panel-subtitle">Scheduled, visited, and live visit activity for the selected date.</p>
+          </div>
+          <div className="visit-detail-summary">
+            <span className="visit-summary-chip visit-summary-chip--scheduled">{scheduledItems.length} scheduled</span>
+            <span className="visit-summary-chip visit-summary-chip--completed">{completedItems.length} visited</span>
+            <span className="visit-summary-chip visit-summary-chip--running">{runningItems.length} running</span>
+          </div>
+        </div>
+
+        {selectedItems.length === 0 ? (
+          <EmptyState title="No visits on this date" copy="Pick another day or schedule a visit task for this date." />
+        ) : (
+          <div className="visit-detail-sections">
+            {runningItems.length > 0 ? (
+              <div className="visit-section">
+                <div className="visit-section-title">
+                  <Clock3 size={15} />
+                  <span>Live Visit Timer</span>
+                </div>
+                <div className="list-stack">
+                  {runningItems.map((item) => (
+                    <article key={item.key} className="list-card visit-list-card visit-list-card--running">
+                      <div className="list-head">
+                        <div className="list-head-copy">
+                          <h4 className="list-title">{item.subject}</h4>
+                          <p className="panel-subtitle">{item.customerName}</p>
+                        </div>
+                        <span className="badge badge-progress">Running</span>
+                      </div>
+                      <div className="visit-meta-row">
+                        <span>{item.projectName}</span>
+                        <span>{item.activityType || "Visit activity"}</span>
+                        <span>{formatTimeLabel(item.fromTime) || "Now"}</span>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {scheduledItems.length > 0 ? (
+              <div className="visit-section">
+                <div className="visit-section-title">
+                  <MapPinned size={15} />
+                  <span>Scheduled Visits</span>
+                </div>
+                <div className="list-stack">
+                  {scheduledItems.map((item) => (
+                    <article key={item.key} className="list-card visit-list-card visit-list-card--scheduled">
+                      <div className="list-head">
+                        <div className="list-head-copy">
+                          <h4 className="list-title">{item.subject}</h4>
+                          <p className="panel-subtitle">{item.customerName}</p>
+                        </div>
+                        <span className={`badge ${statusBadgeClass(item.displayStatus)}`}>
+                          {item.rawStatus || item.displayStatus}
+                        </span>
+                      </div>
+                      <div className="visit-meta-row">
+                        <span>{item.projectName}</span>
+                        <span>{item.rawStatus || "Scheduled"}</span>
+                        <span>{item.taskId}</span>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {completedItems.length > 0 ? (
+              <div className="visit-section">
+                <div className="visit-section-title">
+                  <Sparkles size={15} />
+                  <span>Visits Done</span>
+                </div>
+                <div className="list-stack">
+                  {completedItems.map((item) => (
+                    <article key={item.key} className="list-card visit-list-card visit-list-card--completed">
+                      <div className="list-head">
+                        <div className="list-head-copy">
+                          <h4 className="list-title">{item.subject}</h4>
+                          <p className="panel-subtitle">{item.customerName}</p>
+                        </div>
+                        <span className="badge badge-complete">Visited</span>
+                      </div>
+                      <div className="visit-meta-row">
+                        <span>{item.projectName}</span>
+                        <span>{item.activityType || "Visit activity"}</span>
+                        <span>
+                          {item.hours && item.hours > 0
+                            ? formatWorkedTime(item.hours)
+                            : `${formatTimeLabel(item.fromTime) || "-"}${item.toTime ? ` - ${formatTimeLabel(item.toTime) || "-"}` : ""}`}
+                        </span>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        )}
+      </Panel>
+    </div>
+  );
+}

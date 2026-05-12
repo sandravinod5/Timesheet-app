@@ -33,6 +33,7 @@ export type Task = {
   taskId: string;
   subject: string;
   status: string;
+  rawStatus?: string | null;
   customerId?: string | null;
   customerName?: string | null;
   customerGroup?: string | null;

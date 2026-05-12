@@ -1,5 +1,5 @@
-import { CustomersScreen } from "@/components/customers-screen";
+import { redirect } from "next/navigation";
 
 export default function CustomersPage() {
-  return <CustomersScreen />;
+  redirect("/visits");
 }

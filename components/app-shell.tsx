@@ -6,22 +6,24 @@ import Image from "next/image";
 import {
   ChevronRight,
   BarChart3,
+  CalendarDays,
   CheckSquare,
   Clock3,
   LayoutDashboard,
   LogOut,
   Moon,
-  Sun,
-  Users
+  Sun
 } from "lucide-react";
 
 const navItems = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
   { href: "/tasks", label: "Tasks", icon: CheckSquare },
   { href: "/timesheet", label: "Timesheet", icon: Clock3 },
-  { href: "/customers", label: "Customers", icon: Users },
+  { href: "/visits", label: "Visits", icon: CalendarDays },
   { href: "/reports", label: "Reports", icon: BarChart3 }
 ];
+
+const appCredit = "S";
 
 type AppShellProps = React.PropsWithChildren<{
   user?: {
@@ -137,6 +139,10 @@ export function AppShell({ children, user }: AppShellProps) {
       </header>
 
       <main className="app-main">{children}</main>
+
+      <div className="app-credit" aria-label="App signature">
+        <span>{appCredit}</span>
+      </div>
 
       <div className="nav-wrap">
         <nav className="nav-rail" aria-label="Primary">

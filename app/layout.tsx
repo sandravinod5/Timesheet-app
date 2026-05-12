@@ -4,13 +4,13 @@ import { ToastProvider } from "@/components/toast-provider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Planner",
+  title: "Tracker",
   description: "Task and timesheet management PWA for ERPNext users",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Planner"
+    title: "Tracker"
   },
   icons: {
     icon: "/icon-512.png",

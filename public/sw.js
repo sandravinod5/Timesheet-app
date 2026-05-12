@@ -34,7 +34,7 @@ self.addEventListener("fetch", (event) => {
 
 self.addEventListener("push", (event) => {
   let payload = {
-    title: "Planner",
+    title: "Tracker",
     body: "You have a new update.",
     url: "/timesheet",
     tag: "planner-push"

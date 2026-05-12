@@ -1,6 +1,6 @@
 {
-  "name": "Planner",
-  "short_name": "Planner",
+  "name": "Tracker",
+  "short_name": "Tracker",
   "description": "Task and timesheet management PWA for ERPNext users",
   "start_url": "/",
   "display": "standalone",

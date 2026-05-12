@@ -21,6 +21,7 @@ export function TimerModal({
 }) {
   const [search, setSearch] = useState("");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [activitySearch, setActivitySearch] = useState("");
 
   const filteredTasks = useMemo(() => {
     const normalized = search.trim().toLowerCase();
@@ -33,7 +34,7 @@ export function TimerModal({
         return true;
       }
 
-      return [task.subject, task.customerName, task.projectName, task.taskId]
+      return [task.subject, task.taskId, task.customerName, task.projectName, task.project]
         .filter(Boolean)
         .join(" ")
         .toLowerCase()
@@ -44,10 +45,20 @@ export function TimerModal({
   const handleClose = () => {
     setSelectedTask(null);
     setSearch("");
+    setActivitySearch("");
     onClose();
   };
 
   const availableActivityTypes = activityTypes.length > 0 ? activityTypes : ["Working"];
+  const filteredActivityTypes = useMemo(() => {
+    const normalized = activitySearch.trim().toLowerCase();
+
+    if (!normalized) {
+      return availableActivityTypes;
+    }
+
+    return availableActivityTypes.filter((type) => type.toLowerCase().includes(normalized));
+  }, [activitySearch, availableActivityTypes]);
 
   if (!open) {
     return null;
@@ -59,23 +70,39 @@ export function TimerModal({
         title="Select Activity Type"
         subtitle={selectedTask.subject}
         onClose={handleClose}
-        onBack={() => setSelectedTask(null)}
+        onBack={() => {
+          setSelectedTask(null);
+          setActivitySearch("");
+        }}
       >
-        <div className="list-stack modal-list-stack">
-          {availableActivityTypes.map((type) => (
-            <button
-              key={type}
-              className="list-card"
-              style={{ textAlign: "left" }}
-              type="button"
-              onClick={() => void onStart(selectedTask, type)}
-            >
-              <div className="list-head">
-                <h4 className="list-title">{type}</h4>
-              </div>
-            </button>
-          ))}
-        </div>
+        <label className="input-shell modal-search">
+          <Search size={18} color="var(--muted)" />
+          <input
+            placeholder="Search activity type"
+            value={activitySearch}
+            onChange={(event) => setActivitySearch(event.target.value)}
+          />
+        </label>
+
+        {filteredActivityTypes.length === 0 ? (
+          <EmptyState title="No activity found" copy="Try a different activity name or clear the search." />
+        ) : (
+          <div className="list-stack modal-list-stack">
+            {filteredActivityTypes.map((type) => (
+              <button
+                key={type}
+                className="list-card"
+                style={{ textAlign: "left" }}
+                type="button"
+                onClick={() => void onStart(selectedTask, type)}
+              >
+                <div className="list-head">
+                  <h4 className="list-title">{type}</h4>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
       </Modal>
     );
   }
@@ -85,14 +112,14 @@ export function TimerModal({
       <label className="input-shell modal-search">
         <Search size={18} color="var(--muted)" />
         <input
-          placeholder="Search tasks..."
+          placeholder="Search by task, customer, or project"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
         />
       </label>
 
       {filteredTasks.length === 0 ? (
-        <EmptyState title="No tasks found" copy="Try a different search or clear the current filter." />
+        <EmptyState title="No tasks found" copy="Try task name, customer name, or project name." />
       ) : (
         <div className="list-stack modal-list-stack">
           {filteredTasks.map((task) => (
