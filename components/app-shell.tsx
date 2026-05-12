@@ -23,7 +23,7 @@ const navItems = [
   { href: "/reports", label: "Reports", icon: BarChart3 }
 ];
 
-const appCredit = "S";
+const appCredit = "SR";
 
 type AppShellProps = React.PropsWithChildren<{
   user?: {
