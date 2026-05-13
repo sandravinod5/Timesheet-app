@@ -160,9 +160,16 @@ function DraftEntriesList({
                 </div>
               </div>
             ) : (
-              <div className="muted-row time-range-row" style={{ marginTop: "0.8rem" }}>
-                {formatEntryTime(entry.fromTime)} to {formatEntryTime(entry.toTime)}
-              </div>
+              <>
+                <div className="muted-row time-range-row" style={{ marginTop: "0.8rem" }}>
+                  {formatEntryTime(entry.fromTime)} to {formatEntryTime(entry.toTime)}
+                </div>
+                {entry.notes ? (
+                  <p className="list-description task-supporting-copy" style={{ marginTop: "0.4rem", fontStyle: "italic" }}>
+                    {entry.notes}
+                  </p>
+                ) : null}
+              </>
             )}
 
             {!isEditing && (
@@ -339,7 +346,7 @@ export function TimesheetScreen() {
     );
   }, [payload?.timesheets, search]);
 
-  const startTimer = async (task: Task, activityType: string) => {
+  const startTimer = async (task: Task, activityType: string, notes: string) => {
     const taskId = task?.taskId?.trim();
 
     if (!taskId) {
@@ -351,8 +358,13 @@ export function TimesheetScreen() {
       return;
     }
 
+    const params: Record<string, string> = { task: taskId, activity_type: activityType };
+    if (notes.trim()) {
+      params.notes = notes.trim();
+    }
+
     try {
-      await fetchAction("start_timer", { task: taskId, activity_type: activityType }, "POST");
+      await fetchAction("start_timer", params, "POST");
       setShowTimerModal(false);
       showToast({
         title: "Timer started",
@@ -700,6 +712,11 @@ export function TimesheetScreen() {
                           </span>
                         </div>
                         <p className="list-description task-supporting-copy">{entry.projectName || "No project"}</p>
+                        {entry.notes ? (
+                          <p className="list-description task-supporting-copy" style={{ marginTop: "0.25rem", fontStyle: "italic" }}>
+                            {entry.notes}
+                          </p>
+                        ) : null}
                         <div className="muted-row time-range-row" style={{ marginTop: "0.8rem" }}>
                           {entry.fromTime} {entry.toTime ? `to ${entry.toTime}` : "to now"}
                         </div>

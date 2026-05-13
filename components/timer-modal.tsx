@@ -17,11 +17,13 @@ export function TimerModal({
   tasks: Task[];
   activityTypes: string[];
   onClose: () => void;
-  onStart: (task: Task, activityType: string) => Promise<void>;
+  onStart: (task: Task, activityType: string, notes: string) => Promise<void>;
 }) {
   const [search, setSearch] = useState("");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [selectedActivityType, setSelectedActivityType] = useState<string | null>(null);
   const [activitySearch, setActivitySearch] = useState("");
+  const [notes, setNotes] = useState("");
 
   const filteredTasks = useMemo(() => {
     const normalized = search.trim().toLowerCase();
@@ -44,8 +46,10 @@ export function TimerModal({
 
   const handleClose = () => {
     setSelectedTask(null);
+    setSelectedActivityType(null);
     setSearch("");
     setActivitySearch("");
+    setNotes("");
     onClose();
   };
 
@@ -64,6 +68,42 @@ export function TimerModal({
     return null;
   }
 
+  // Step 3 — description + start
+  if (selectedTask && selectedActivityType) {
+    return (
+      <Modal
+        title="Add Description"
+        subtitle={`${selectedTask.subject} · ${selectedActivityType}`}
+        onClose={handleClose}
+        onBack={() => {
+          setSelectedActivityType(null);
+          setNotes("");
+        }}
+      >
+        <div className="draft-edit-row draft-edit-row--full" style={{ marginBottom: "1.25rem" }}>
+          <label className="report-date-label">Description (optional)</label>
+          <textarea
+            className="draft-edit-textarea"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="What are you working on?"
+            rows={4}
+            autoFocus
+          />
+        </div>
+        <button
+          type="button"
+          className="timer-action-button timer-action-button-start"
+          style={{ width: "100%" }}
+          onClick={() => void onStart(selectedTask, selectedActivityType, notes)}
+        >
+          Start Timer
+        </button>
+      </Modal>
+    );
+  }
+
+  // Step 2 — activity type
   if (selectedTask) {
     return (
       <Modal
@@ -94,7 +134,7 @@ export function TimerModal({
                 className="list-card"
                 style={{ textAlign: "left" }}
                 type="button"
-                onClick={() => void onStart(selectedTask, type)}
+                onClick={() => setSelectedActivityType(type)}
               >
                 <div className="list-head">
                   <h4 className="list-title">{type}</h4>
@@ -107,6 +147,7 @@ export function TimerModal({
     );
   }
 
+  // Step 1 — task selection
   return (
     <Modal title="Start Timer" subtitle="Pick one of your active tasks" onClose={handleClose}>
       <label className="input-shell modal-search">
