@@ -122,7 +122,7 @@ export function LoadingState({ label = "Loading..." }: { label?: string }) {
     <div className="loading-state">
       <div className="loading-state-copy">
         <div className="loading-state-brand">
-          <div className="loading-state-ring" aria-hidden="true" />
+          <img src="/s-loader.svg" width="52" height="52" alt="" aria-hidden="true" />
         </div>
         <p className="empty-copy">{label}</p>
       </div>

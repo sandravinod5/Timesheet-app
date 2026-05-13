@@ -10,7 +10,8 @@ import { Button, EmptyState, InputShell, LoadingState, Panel } from "@/component
 import { useToast } from "@/components/toast-provider";
 import { TimerModal } from "@/components/timer-modal";
 
-function toDateTimeLocal(value: string) {
+function toDateTimeLocal(value: string | null | undefined) {
+  if (!value) return "";
   const parsed = parseErpDateTime(value);
   if (!parsed) {
     return value.replace(" ", "T").slice(0, 16);
@@ -64,8 +65,10 @@ function DraftEntriesList({
   editingId,
   editFrom,
   editTo,
+  editNotes,
   onEditFromChange,
   onEditToChange,
+  onEditNotesChange,
   onSaveEdit,
   onCancelEdit,
   saving
@@ -76,8 +79,10 @@ function DraftEntriesList({
   editingId: string | null;
   editFrom: string;
   editTo: string;
+  editNotes: string;
   onEditFromChange: (v: string) => void;
   onEditToChange: (v: string) => void;
+  onEditNotesChange: (v: string) => void;
   onSaveEdit: () => void;
   onCancelEdit: () => void;
   saving: boolean;
@@ -121,6 +126,16 @@ function DraftEntriesList({
                     value={editTo}
                     min={editFrom || undefined}
                     onChange={(e) => onEditToChange(e.target.value)}
+                  />
+                </div>
+                <div className="draft-edit-row draft-edit-row--full">
+                  <label className="report-date-label">Description</label>
+                  <textarea
+                    className="draft-edit-textarea"
+                    value={editNotes}
+                    onChange={(e) => onEditNotesChange(e.target.value)}
+                    placeholder="Add description"
+                    rows={3}
                   />
                 </div>
                 <div className="button-row" style={{ marginTop: "0.5rem" }}>
@@ -196,6 +211,7 @@ export function TimesheetScreen() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editFrom, setEditFrom] = useState("");
   const [editTo, setEditTo] = useState("");
+  const [editNotes, setEditNotes] = useState("");
   const [draftSaving, setDraftSaving] = useState(false);
   const [draftError, setDraftError] = useState<string | null>(null);
   const [draftsOpen, setDraftsOpen] = useState(false);
@@ -391,10 +407,21 @@ export function TimesheetScreen() {
     setEditingId(entry.timesheetDetailId);
     setEditFrom(toDateTimeLocal(entry.fromTime));
     setEditTo(toDateTimeLocal(entry.toTime));
+    setEditNotes(entry.notes || "");
   };
 
   const handleSaveEdit = async () => {
     if (!editingId) return;
+    if (!editFrom || !editTo) {
+      setDraftError("Start and end times are required.");
+      return;
+    }
+    const fromVal = fromDateTimeLocal(editFrom);
+    const toVal = fromDateTimeLocal(editTo);
+    if (fromVal >= toVal) {
+      setDraftError("End time must be after start time.");
+      return;
+    }
     setDraftSaving(true);
     setDraftError(null);
     try {
@@ -402,12 +429,14 @@ export function TimesheetScreen() {
         "update_draft_entry",
         {
           timesheet_detail_id: editingId,
-          from_time: fromDateTimeLocal(editFrom),
-          to_time: fromDateTimeLocal(editTo)
+          from_time: fromVal,
+          to_time: toVal,
+          notes: editNotes
         },
         "POST"
       );
       setEditingId(null);
+      setEditNotes("");
       showToast({
         title: "Draft updated",
         message: "Your draft entry changes were saved."
@@ -536,10 +565,15 @@ export function TimesheetScreen() {
                   editingId={editingId}
                   editFrom={editFrom}
                   editTo={editTo}
+                  editNotes={editNotes}
                   onEditFromChange={setEditFrom}
                   onEditToChange={setEditTo}
+                  onEditNotesChange={setEditNotes}
                   onSaveEdit={() => void handleSaveEdit()}
-                  onCancelEdit={() => setEditingId(null)}
+                  onCancelEdit={() => {
+                    setEditingId(null);
+                    setEditNotes("");
+                  }}
                   saving={draftSaving}
                 />
               )}

@@ -1112,6 +1112,38 @@ button {
   flex: 1;
 }
 
+.draft-edit-row--full {
+  display: grid;
+  gap: 0.45rem;
+  align-items: stretch;
+}
+
+.draft-edit-row--full .report-date-label {
+  min-width: 0;
+}
+
+.draft-edit-textarea {
+  width: 100%;
+  min-height: 5.75rem;
+  resize: vertical;
+  padding: 0.75rem 0.85rem;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface-strong);
+  color: var(--foreground);
+  font: inherit;
+  line-height: 1.45;
+  box-shadow: inset 1px 1px 0 var(--card-inset-highlight);
+}
+
+.draft-edit-textarea:focus {
+  outline: none;
+  border-color: rgba(122, 144, 245, 0.45);
+  box-shadow:
+    inset 1px 1px 0 var(--card-inset-highlight),
+    0 0 0 3px rgba(122, 144, 245, 0.16);
+}
+
 .metric-grid--timesheet {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }

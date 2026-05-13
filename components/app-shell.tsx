@@ -23,8 +23,6 @@ const navItems = [
   { href: "/reports", label: "Reports", icon: BarChart3 }
 ];
 
-const appCredit = "SR";
-
 type AppShellProps = React.PropsWithChildren<{
   user?: {
     email?: string;
@@ -139,10 +137,6 @@ export function AppShell({ children, user }: AppShellProps) {
       </header>
 
       <main className="app-main">{children}</main>
-
-      <div className="app-credit" aria-label="App signature">
-        <span>{appCredit}</span>
-      </div>
 
       <div className="nav-wrap">
         <nav className="nav-rail" aria-label="Primary">
