@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { ArrowLeft, X } from "lucide-react";
 
 type ClassNameProps = {
@@ -160,6 +161,17 @@ export function Modal({
   onBack?: () => void;
   size?: "default" | "wide";
 }>) {
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div

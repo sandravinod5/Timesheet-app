@@ -12,7 +12,7 @@ import {
 import { fetchAction } from "@/lib/client";
 import type { Task, TimesheetsData } from "@/lib/types";
 import { formatWorkedTime, statusBadgeClass } from "@/lib/utils";
-import { EmptyState, LoadingState, Panel } from "@/components/ui";
+import { EmptyState, LoadingState, Modal, Panel } from "@/components/ui";
 
 type VisitItem = {
   key: string;
@@ -105,6 +105,15 @@ function formatTimeLabel(value?: string | null) {
   });
 }
 
+function formatDateShortLabel(value: string) {
+  const parsed = new Date(`${value}T00:00:00`);
+  return parsed.toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric"
+  });
+}
+
 function isVisitProjectType(value?: string | null) {
   const normalized = String(value || "").trim().toLowerCase();
   if (!normalized) {
@@ -151,9 +160,143 @@ function addVisit(map: Record<string, VisitItem[]>, item: VisitItem) {
   map[item.date].push(item);
 }
 
+function VisitDetailsModal({
+  date,
+  items,
+  onClose
+}: {
+  date: string;
+  items: VisitItem[];
+  onClose: () => void;
+}) {
+  const runningItems = items.filter((item) => item.kind === "running");
+  const scheduledItems = items.filter((item) => item.kind === "scheduled");
+  const completedItems = items.filter((item) => item.kind === "completed");
+
+  return (
+    <Modal
+      title={formatDayLabel(date)}
+      subtitle="Scheduled, visited, and live visit activity for the selected date."
+      onClose={onClose}
+      size="wide"
+    >
+      <div className="visit-modal-overview">
+        <article className="visit-modal-stat visit-modal-stat--scheduled">
+          <span className="visit-modal-stat-label">Scheduled</span>
+          <strong className="visit-modal-stat-value">{scheduledItems.length}</strong>
+        </article>
+        <article className="visit-modal-stat visit-modal-stat--completed">
+          <span className="visit-modal-stat-label">Visited</span>
+          <strong className="visit-modal-stat-value">{completedItems.length}</strong>
+        </article>
+        <article className="visit-modal-stat visit-modal-stat--running">
+          <span className="visit-modal-stat-label">Running</span>
+          <strong className="visit-modal-stat-value">{runningItems.length}</strong>
+        </article>
+      </div>
+
+      {items.length === 0 ? (
+        <div className="visit-modal-empty">
+          <EmptyState title="No visits on this date" copy="Pick another day or schedule a visit task for this date." />
+        </div>
+      ) : (
+        <div className="visit-detail-sections visit-detail-sections--modal">
+          {runningItems.length > 0 ? (
+            <div className="visit-section">
+              <div className="visit-section-title">
+                <Clock3 size={15} />
+                <span>Live Visit Timer</span>
+              </div>
+              <div className="list-stack">
+                {runningItems.map((item) => (
+                  <article key={item.key} className="list-card visit-list-card visit-list-card--running">
+                    <div className="list-head">
+                      <div className="list-head-copy">
+                        <h4 className="list-title">{item.subject}</h4>
+                        <p className="panel-subtitle">{item.customerName}</p>
+                      </div>
+                      <span className="badge badge-progress">Running</span>
+                    </div>
+                    <div className="visit-meta-row">
+                      <span>{item.projectName}</span>
+                      <span>{item.activityType || "Visit activity"}</span>
+                      <span>{formatTimeLabel(item.fromTime) || "Now"}</span>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {scheduledItems.length > 0 ? (
+            <div className="visit-section">
+              <div className="visit-section-title">
+                <MapPinned size={15} />
+                <span>Scheduled Visits</span>
+              </div>
+              <div className="list-stack">
+                {scheduledItems.map((item) => (
+                  <article key={item.key} className="list-card visit-list-card visit-list-card--scheduled">
+                    <div className="list-head">
+                      <div className="list-head-copy">
+                        <h4 className="list-title">{item.subject}</h4>
+                        <p className="panel-subtitle">{item.customerName}</p>
+                      </div>
+                      <span className={`badge ${statusBadgeClass(item.displayStatus)}`}>
+                        {item.rawStatus || item.displayStatus}
+                      </span>
+                    </div>
+                    <div className="visit-meta-row">
+                      <span>{item.projectName}</span>
+                      <span>{item.rawStatus || "Scheduled"}</span>
+                      <span>{item.taskId}</span>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {completedItems.length > 0 ? (
+            <div className="visit-section">
+              <div className="visit-section-title">
+                <Sparkles size={15} />
+                <span>Visits Done</span>
+              </div>
+              <div className="list-stack">
+                {completedItems.map((item) => (
+                  <article key={item.key} className="list-card visit-list-card visit-list-card--completed">
+                    <div className="list-head">
+                      <div className="list-head-copy">
+                        <h4 className="list-title">{item.subject}</h4>
+                        <p className="panel-subtitle">{item.customerName}</p>
+                      </div>
+                      <span className="badge badge-complete">Visited</span>
+                    </div>
+                    <div className="visit-meta-row">
+                      <span>{item.projectName}</span>
+                      <span>{item.activityType || "Visit activity"}</span>
+                      <span>
+                        {item.hours && item.hours > 0
+                          ? formatWorkedTime(item.hours)
+                          : `${formatTimeLabel(item.fromTime) || "-"}${item.toTime ? ` - ${formatTimeLabel(item.toTime) || "-"}` : ""}`}
+                      </span>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      )}
+    </Modal>
+  );
+}
+
 export function VisitsScreen() {
   const [monthCursor, setMonthCursor] = useState(firstOfMonth(new Date()));
   const [selectedDate, setSelectedDate] = useState(dateKey(new Date()));
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [timesheetData, setTimesheetData] = useState<TimesheetsData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -359,9 +502,20 @@ export function VisitsScreen() {
   }, [monthCursor, selectedDate, visitData]);
 
   const selectedItems = visitData[selectedDate] || [];
-  const runningItems = selectedItems.filter((item) => item.kind === "running");
-  const scheduledItems = selectedItems.filter((item) => item.kind === "scheduled");
-  const completedItems = selectedItems.filter((item) => item.kind === "completed");
+  const monthlyScheduledItems = useMemo(
+    () =>
+      Object.values(visitData)
+        .flat()
+        .filter((item) => item.kind === "scheduled")
+        .sort((left, right) => {
+          if (left.date !== right.date) {
+            return left.date.localeCompare(right.date);
+          }
+
+          return left.subject.localeCompare(right.subject);
+        }),
+    [visitData]
+  );
 
   if (loading && !timesheetData && tasks.length === 0) {
     return <LoadingState label="Loading visits..." />;
@@ -384,9 +538,6 @@ export function VisitsScreen() {
             <p className="panel-subtitle visit-hero-copy">
               Track scheduled visits, completed visits, and live visit timers by date.
             </p>
-          </div>
-          <div className="visit-hero-icon">
-            <CalendarDays size={22} />
           </div>
         </div>
 
@@ -468,7 +619,10 @@ export function VisitsScreen() {
                   items.length > 0 ? "has-visits" : ""
                 ].filter(Boolean).join(" ")}
                 style={{ animationDelay: `${index * 18}ms` }}
-                onClick={() => setSelectedDate(day.key)}
+                onClick={() => {
+                  setSelectedDate(day.key);
+                  setIsDetailsOpen(true);
+                }}
               >
                 <span className="visit-day-number">{day.dayNumber}</span>
                 <div className="visit-day-labels">
@@ -492,112 +646,47 @@ export function VisitsScreen() {
         </div>
       </Panel>
 
-      <Panel className="visit-detail-panel">
-        <div className="visit-detail-head">
+      <Panel className="visit-month-schedule-panel">
+        <div className="visit-month-schedule-head">
           <div>
-            <h3 className="panel-title">{formatDayLabel(selectedDate)}</h3>
-            <p className="panel-subtitle">Scheduled, visited, and live visit activity for the selected date.</p>
+            <h3 className="panel-title">Scheduled Visits This Month</h3>
           </div>
-          <div className="visit-detail-summary">
-            <span className="visit-summary-chip visit-summary-chip--scheduled">{scheduledItems.length} scheduled</span>
-            <span className="visit-summary-chip visit-summary-chip--completed">{completedItems.length} visited</span>
-            <span className="visit-summary-chip visit-summary-chip--running">{runningItems.length} running</span>
-          </div>
+          <span className="visit-summary-chip visit-summary-chip--scheduled">{monthlyScheduledItems.length} scheduled</span>
         </div>
 
-        {selectedItems.length === 0 ? (
-          <EmptyState title="No visits on this date" copy="Pick another day or schedule a visit task for this date." />
+        {monthlyScheduledItems.length === 0 ? (
+          <EmptyState title="No scheduled visits this month" copy="Any remaining scheduled visit tasks for this month will appear here." />
         ) : (
-          <div className="visit-detail-sections">
-            {runningItems.length > 0 ? (
-              <div className="visit-section">
-                <div className="visit-section-title">
-                  <Clock3 size={15} />
-                  <span>Live Visit Timer</span>
+          <div className="list-stack visit-month-schedule-list">
+            {monthlyScheduledItems.map((item) => (
+              <article key={item.key} className="list-card visit-list-card visit-list-card--scheduled">
+                <div className="list-head">
+                  <div className="list-head-copy">
+                    <h4 className="list-title">{item.customerName}</h4>
+                    <p className="panel-subtitle">{item.subject || "Scheduled visit"}</p>
+                  </div>
+                  <span className={`badge ${statusBadgeClass(item.displayStatus)}`}>
+                    {item.rawStatus || "Scheduled"}
+                  </span>
                 </div>
-                <div className="list-stack">
-                  {runningItems.map((item) => (
-                    <article key={item.key} className="list-card visit-list-card visit-list-card--running">
-                      <div className="list-head">
-                        <div className="list-head-copy">
-                          <h4 className="list-title">{item.subject}</h4>
-                          <p className="panel-subtitle">{item.customerName}</p>
-                        </div>
-                        <span className="badge badge-progress">Running</span>
-                      </div>
-                      <div className="visit-meta-row">
-                        <span>{item.projectName}</span>
-                        <span>{item.activityType || "Visit activity"}</span>
-                        <span>{formatTimeLabel(item.fromTime) || "Now"}</span>
-                      </div>
-                    </article>
-                  ))}
+                <div className="visit-meta-row">
+                  <span>{formatDateShortLabel(item.date)}</span>
+                  <span>{formatTimeLabel(item.fromTime) || "Time not set"}</span>
+                  <span>{item.taskId}</span>
                 </div>
-              </div>
-            ) : null}
-
-            {scheduledItems.length > 0 ? (
-              <div className="visit-section">
-                <div className="visit-section-title">
-                  <MapPinned size={15} />
-                  <span>Scheduled Visits</span>
-                </div>
-                <div className="list-stack">
-                  {scheduledItems.map((item) => (
-                    <article key={item.key} className="list-card visit-list-card visit-list-card--scheduled">
-                      <div className="list-head">
-                        <div className="list-head-copy">
-                          <h4 className="list-title">{item.subject}</h4>
-                          <p className="panel-subtitle">{item.customerName}</p>
-                        </div>
-                        <span className={`badge ${statusBadgeClass(item.displayStatus)}`}>
-                          {item.rawStatus || item.displayStatus}
-                        </span>
-                      </div>
-                      <div className="visit-meta-row">
-                        <span>{item.projectName}</span>
-                        <span>{item.rawStatus || "Scheduled"}</span>
-                        <span>{item.taskId}</span>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-
-            {completedItems.length > 0 ? (
-              <div className="visit-section">
-                <div className="visit-section-title">
-                  <Sparkles size={15} />
-                  <span>Visits Done</span>
-                </div>
-                <div className="list-stack">
-                  {completedItems.map((item) => (
-                    <article key={item.key} className="list-card visit-list-card visit-list-card--completed">
-                      <div className="list-head">
-                        <div className="list-head-copy">
-                          <h4 className="list-title">{item.subject}</h4>
-                          <p className="panel-subtitle">{item.customerName}</p>
-                        </div>
-                        <span className="badge badge-complete">Visited</span>
-                      </div>
-                      <div className="visit-meta-row">
-                        <span>{item.projectName}</span>
-                        <span>{item.activityType || "Visit activity"}</span>
-                        <span>
-                          {item.hours && item.hours > 0
-                            ? formatWorkedTime(item.hours)
-                            : `${formatTimeLabel(item.fromTime) || "-"}${item.toTime ? ` - ${formatTimeLabel(item.toTime) || "-"}` : ""}`}
-                        </span>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              </div>
-            ) : null}
+              </article>
+            ))}
           </div>
         )}
       </Panel>
+
+      {isDetailsOpen ? (
+        <VisitDetailsModal
+          date={selectedDate}
+          items={selectedItems}
+          onClose={() => setIsDetailsOpen(false)}
+        />
+      ) : null}
     </div>
   );
 }
