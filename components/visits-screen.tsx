@@ -10,6 +10,7 @@ import {
   Sparkles
 } from "lucide-react";
 import { fetchAction } from "@/lib/client";
+import { formatLocalDate, formatLocalTime, getDateKeyFromDateTime, parseApiDateTime } from "@/lib/datetime";
 import type { Task, TimesheetsData } from "@/lib/types";
 import { formatWorkedTime, statusBadgeClass } from "@/lib/utils";
 import { EmptyState, LoadingState, Modal, Panel } from "@/components/ui";
@@ -26,7 +27,9 @@ type VisitItem = {
   displayStatus: string;
   activityType?: string | null;
   fromTime?: string | null;
+  fromTimeUtc?: string | null;
   toTime?: string | null;
+  toTimeUtc?: string | null;
   hours?: number;
 };
 
@@ -54,12 +57,7 @@ function shiftMonth(date: Date, amount: number) {
 }
 
 function extractDate(value?: string | null) {
-  if (!value) {
-    return null;
-  }
-
-  const match = String(value).match(/\d{4}-\d{2}-\d{2}/);
-  return match ? match[0] : null;
+  return getDateKeyFromDateTime(value);
 }
 
 function compactVisitLabel(item: VisitItem) {
@@ -80,38 +78,24 @@ function formatMonthLabel(date: Date) {
 }
 
 function formatDayLabel(value: string) {
-  const date = new Date(`${value}T00:00:00`);
-  return date.toLocaleDateString(undefined, {
+  const parsed = parseApiDateTime(`${value}T00:00:00`);
+  if (!parsed) {
+    return value;
+  }
+
+  return parsed.toLocaleDateString(undefined, {
     weekday: "long",
     day: "numeric",
     month: "long"
   });
 }
 
-function formatTimeLabel(value?: string | null) {
-  if (!value) {
-    return null;
-  }
-
-  const normalized = value.includes("T") ? value : value.replace(" ", "T");
-  const parsed = new Date(normalized);
-  if (Number.isNaN(parsed.getTime())) {
-    return null;
-  }
-
-  return parsed.toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit"
-  });
+function formatTimeLabel(value?: string | null, utcValue?: string | null) {
+  return formatLocalTime(value, utcValue);
 }
 
 function formatDateShortLabel(value: string) {
-  const parsed = new Date(`${value}T00:00:00`);
-  return parsed.toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric"
-  });
+  return formatLocalDate(value) || value;
 }
 
 function isVisitProjectType(value?: string | null) {
@@ -220,7 +204,7 @@ function VisitDetailsModal({
                     <div className="visit-meta-row">
                       <span>{item.projectName}</span>
                       <span>{item.activityType || "Visit activity"}</span>
-                      <span>{formatTimeLabel(item.fromTime) || "Now"}</span>
+                      <span>{formatTimeLabel(item.fromTime, item.fromTimeUtc) || "Now"}</span>
                     </div>
                   </article>
                 ))}
@@ -279,7 +263,7 @@ function VisitDetailsModal({
                       <span>
                         {item.hours && item.hours > 0
                           ? formatWorkedTime(item.hours)
-                          : `${formatTimeLabel(item.fromTime) || "-"}${item.toTime ? ` - ${formatTimeLabel(item.toTime) || "-"}` : ""}`}
+                          : `${formatTimeLabel(item.fromTime, item.fromTimeUtc) || "-"}${item.toTime ? ` - ${formatTimeLabel(item.toTime, item.toTimeUtc) || "-"}` : ""}`}
                       </span>
                     </div>
                   </article>
@@ -364,7 +348,7 @@ export function VisitsScreen() {
         continue;
       }
 
-      const visitDate = extractDate(entry.fromTime);
+      const visitDate = extractDate(entry.fromTimeUtc || entry.fromTime);
       if (!visitDate) {
         continue;
       }
@@ -377,16 +361,26 @@ export function VisitsScreen() {
       if (existing) {
         existing.hours = Number(((existing.hours || 0) + (entry.hours || 0)).toFixed(2));
 
-        const existingFrom = existing.fromTime ? new Date(existing.fromTime).getTime() : Number.POSITIVE_INFINITY;
-        const nextFrom = entry.fromTime ? new Date(entry.fromTime).getTime() : Number.POSITIVE_INFINITY;
+        const existingFrom = existing.fromTime
+          ? (parseApiDateTime(existing.fromTime, existing.fromTimeUtc)?.getTime() ?? Number.POSITIVE_INFINITY)
+          : Number.POSITIVE_INFINITY;
+        const nextFrom = entry.fromTime
+          ? (parseApiDateTime(entry.fromTime, entry.fromTimeUtc)?.getTime() ?? Number.POSITIVE_INFINITY)
+          : Number.POSITIVE_INFINITY;
         if (nextFrom < existingFrom) {
           existing.fromTime = entry.fromTime;
+          existing.fromTimeUtc = entry.fromTimeUtc;
         }
 
-        const existingTo = existing.toTime ? new Date(existing.toTime).getTime() : Number.NEGATIVE_INFINITY;
-        const nextTo = entry.toTime ? new Date(entry.toTime).getTime() : Number.NEGATIVE_INFINITY;
+        const existingTo = existing.toTime
+          ? (parseApiDateTime(existing.toTime, existing.toTimeUtc)?.getTime() ?? Number.NEGATIVE_INFINITY)
+          : Number.NEGATIVE_INFINITY;
+        const nextTo = entry.toTime
+          ? (parseApiDateTime(entry.toTime, entry.toTimeUtc)?.getTime() ?? Number.NEGATIVE_INFINITY)
+          : Number.NEGATIVE_INFINITY;
         if (nextTo > existingTo) {
           existing.toTime = entry.toTime;
+          existing.toTimeUtc = entry.toTimeUtc;
         }
 
         if (!existing.activityType && entry.activityType) {
@@ -405,7 +399,9 @@ export function VisitsScreen() {
           displayStatus: entry.isRunning ? "Running" : "Visited",
           activityType: entry.activityType,
           fromTime: entry.fromTime,
+          fromTimeUtc: entry.fromTimeUtc,
           toTime: entry.toTime,
+          toTimeUtc: entry.toTimeUtc,
           hours: entry.hours
         });
       }
@@ -671,7 +667,7 @@ export function VisitsScreen() {
                 </div>
                 <div className="visit-meta-row">
                   <span>{formatDateShortLabel(item.date)}</span>
-                  <span>{formatTimeLabel(item.fromTime) || "Time not set"}</span>
+                  <span>{formatTimeLabel(item.fromTime, item.fromTimeUtc) || "Time not set"}</span>
                   <span>{item.taskId}</span>
                 </div>
               </article>

@@ -11,6 +11,7 @@ import {
   TrendingUp
 } from "lucide-react";
 import { fetchAction } from "@/lib/client";
+import { formatLocalTime, getElapsedSeconds } from "@/lib/datetime";
 import { showSystemNotification } from "@/lib/notifications";
 import type { ActivityTypesData, OverviewData, Task, TimesheetsData } from "@/lib/types";
 import { formatDuration, formatHours, formatWorkedTime, statusBadgeClass } from "@/lib/utils";
@@ -21,23 +22,8 @@ import { TimerModal } from "@/components/timer-modal";
 
 const STANDARD_HOURS_PER_DAY = 7;
 
-function formatClockTime(value?: string | null) {
-  if (!value) {
-    return "-";
-  }
-
-  const normalized = value.includes("T") ? value : value.replace(" ", "T");
-  const parsed = new Date(normalized);
-
-  if (!Number.isNaN(parsed.getTime())) {
-    return parsed.toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit"
-    });
-  }
-
-  const match = value.match(/\b(\d{2}:\d{2})/);
-  return match ? match[1] : value;
+function formatClockTime(value?: string | null, utcValue?: string | null) {
+  return formatLocalTime(value, utcValue) || "-";
 }
 
 function formatPeriodLabel(fromDate?: string, toDate?: string) {
@@ -139,14 +125,13 @@ export function OverviewScreen() {
     }
 
     const run = () => {
-      const start = new Date(data.runningTimer?.fromTime || "").getTime();
-      setElapsed(Math.max(0, Math.floor((Date.now() - start) / 1000)));
+      setElapsed(getElapsedSeconds(data.runningTimer?.fromTime, data.runningTimer?.fromTimeUtc));
     };
 
     run();
     const timer = window.setInterval(run, 1000);
     return () => window.clearInterval(timer);
-  }, [data?.runningTimer?.fromTime]);
+  }, [data?.runningTimer?.fromTime, data?.runningTimer?.fromTimeUtc]);
 
   const expectedHours = useMemo(() => {
     if (!data) {
@@ -473,7 +458,7 @@ export function OverviewScreen() {
                       </span>
                     </div>
                     <div className="muted-row time-range-row" style={{ marginTop: "0.7rem" }}>
-                      {formatClockTime(entry.fromTime)} to {formatClockTime(entry.toTime)}
+                      {formatClockTime(entry.fromTime, entry.fromTimeUtc)} to {formatClockTime(entry.toTime, entry.toTimeUtc)}
                     </div>
                   </article>
                 ))
@@ -520,7 +505,7 @@ export function OverviewScreen() {
                       <span>{entry.activityType || "Visit"}</span>
                     </div>
                     <div className="muted-row time-range-row" style={{ marginTop: "0.45rem" }}>
-                      {formatClockTime(entry.fromTime)} to {entry.toTime ? formatClockTime(entry.toTime) : "Running"}
+                      {formatClockTime(entry.fromTime, entry.fromTimeUtc)} to {entry.toTime ? formatClockTime(entry.toTime, entry.toTimeUtc) : "Running"}
                     </div>
                   </article>
                 ))

@@ -16,6 +16,13 @@ export type RunningTimer = {
   timesheetId: string;
   task: string;
   taskSubject: string;
+  owner?: string | null;
+  userId?: string | null;
+  employee?: string | null;
+  employeeId?: string | null;
+  employeeName?: string | null;
+  createdBy?: string | null;
+  createdByEmail?: string | null;
   customerId?: string | null;
   customerName?: string | null;
   project?: string | null;
@@ -23,7 +30,9 @@ export type RunningTimer = {
   activityType?: string | null;
   notes?: string | null;
   fromTime: string;
+  fromTimeUtc?: string | null;
   toTime?: string | null;
+  toTimeUtc?: string | null;
   hours: number;
   liveHours?: number;
   isRunning: boolean;
@@ -59,6 +68,7 @@ export type TaskSummary = {
 export type OverviewData = {
   employee: UserSummary;
   period: { fromDate: string; toDate: string };
+  serverNowUtc?: string;
   runningTimer: RunningTimer | null;
   monthSummary: { trackedHours: number; expectedHours: number };
   kpis: TaskSummary;
@@ -75,6 +85,7 @@ export type TimesheetEntry = RunningTimer;
 
 export type TimesheetsData = {
   period: { fromDate: string; toDate: string };
+  serverNowUtc?: string;
   runningTimer: RunningTimer | null;
   summary: { entries: number; completedEntries: number; totalHours: number };
   timesheets: TimesheetEntry[];
@@ -104,6 +115,7 @@ export type ReportDefinition = {
 
 export type ReportsData = {
   period: { fromDate: string; toDate: string };
+  serverNowUtc?: string;
   availableReports: ReportDefinition[];
   summary?: {
     kpiCards?: KpiCardsData["kpis"];
@@ -155,6 +167,7 @@ export type ActiveTimerKpi = {
   taskSubject?: string | null;
   customerName?: string | null;
   fromTime?: string | null;
+  fromTimeUtc?: string | null;
 };
 
 export type DraftEntry = {
@@ -169,7 +182,9 @@ export type DraftEntry = {
   activityType: string | null;
   notes: string | null;
   fromTime: string;
+  fromTimeUtc?: string | null;
   toTime: string;
+  toTimeUtc?: string | null;
   hours: number;
   canSubmit: boolean;
 };
@@ -180,6 +195,7 @@ export type DraftsData = {
 
 export type KpiCardsData = {
   period: { fromDate: string; toDate: string };
+  serverNowUtc?: string;
   kpis: {
     tasksCompleted: KpiCard;
     tasksInProgress: KpiCard;

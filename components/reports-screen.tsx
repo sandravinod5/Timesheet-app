@@ -10,17 +10,18 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { fetchAction } from "@/lib/client";
+import { formatLocalDate, formatLocalTime, getElapsedSeconds, getLocalDateInputValue } from "@/lib/datetime";
 import type { HoursByDay, KpiCardsData, ReportsData, VisitByCustomer } from "@/lib/types";
 import { formatDuration, formatHours } from "@/lib/utils";
 import { EmptyState, LoadingState, Panel } from "@/components/ui";
 
 function todayStr() {
-  return new Date().toISOString().slice(0, 10);
+  return getLocalDateInputValue();
 }
 
 function firstOfMonthStr() {
   const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+  return getLocalDateInputValue(new Date(d.getFullYear(), d.getMonth(), 1));
 }
 
 function colorClass(color?: string) {
@@ -44,42 +45,16 @@ function colorClass(color?: string) {
 }
 
 function formatDateLabel(value: string) {
-  const parsed = new Date(value.includes("T") ? value : value.replace(" ", "T"));
-  if (Number.isNaN(parsed.getTime())) {
-    return value;
-  }
-
-  return parsed.toLocaleDateString([], {
-    month: "short",
-    day: "numeric"
-  });
+  const formatted = formatLocalDate(value);
+  return formatted || value;
 }
 
 function formatVisitDateLabel(value: string) {
-  const parsed = new Date(value.includes("T") ? value : `${value}T00:00:00`);
-  if (Number.isNaN(parsed.getTime())) {
-    return value;
-  }
-
-  return parsed.toLocaleDateString([], {
-    year: "numeric",
-    month: "short",
-    day: "numeric"
-  });
+  return formatLocalDate(value) || value;
 }
 
-function formatTimerClock(value?: string | null) {
-  if (!value) {
-    return "-";
-  }
-
-  const parsed = new Date(value.includes("T") ? value : value.replace(" ", "T"));
-  if (!Number.isNaN(parsed.getTime())) {
-    return parsed.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  }
-
-  const match = value.match(/\b(\d{2}:\d{2})/);
-  return match ? match[1] : value;
+function formatTimerClock(value?: string | null, utcValue?: string | null) {
+  return formatLocalTime(value, utcValue) || "-";
 }
 
 function ReportKpiCard({
@@ -327,13 +302,12 @@ export function ReportsScreen() {
     }
 
     const run = () => {
-      const start = new Date(fromTime.includes("T") ? fromTime : fromTime.replace(" ", "T")).getTime();
-      setTimerElapsed(Math.max(0, Math.floor((Date.now() - start) / 1000)));
+      setTimerElapsed(getElapsedSeconds(fromTime, kpiCards?.activeTimer?.fromTimeUtc));
     };
     run();
     const interval = window.setInterval(run, 1000);
     return () => window.clearInterval(interval);
-  }, [kpiCards?.activeTimer?.fromTime]);
+  }, [kpiCards?.activeTimer?.fromTime, kpiCards?.activeTimer?.fromTimeUtc]);
   const hoursByDay =
     dashboardPayload?.hoursByDay ||
     dashboardPayload?.summary?.hoursByDay ||
@@ -520,7 +494,9 @@ export function ReportsScreen() {
                 <p className="report-active-copy">{kpiCards.activeTimer.taskSubject || "No task selected"}</p>
                 <p className="report-active-meta">
                   {kpiCards.activeTimer.customerName || "No customer"}
-                  {kpiCards.activeTimer.fromTime ? ` • Started ${formatTimerClock(kpiCards.activeTimer.fromTime)}` : ""}
+                  {kpiCards.activeTimer.fromTime
+                    ? ` • Started ${formatTimerClock(kpiCards.activeTimer.fromTime, kpiCards.activeTimer.fromTimeUtc)}`
+                    : ""}
                 </p>
               </div>
             ) : (

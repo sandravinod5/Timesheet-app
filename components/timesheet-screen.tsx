@@ -3,6 +3,7 @@
 import { Check, Clock3, FileEdit, Search, Square, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { fetchAction } from "@/lib/client";
+import { formatDateTimeLocalInput, formatLocalDateTime } from "@/lib/datetime";
 import { requestNotificationPermission, shouldSendNotification, showSystemNotification, getNotificationPermissionState } from "@/lib/notifications";
 import type { ActivityTypesData, DraftEntry, DraftsData, Task, TimesheetsData } from "@/lib/types";
 import { formatHours, formatWorkedTime } from "@/lib/utils";
@@ -10,52 +11,21 @@ import { Button, EmptyState, InputShell, LoadingState, Panel } from "@/component
 import { useToast } from "@/components/toast-provider";
 import { TimerModal } from "@/components/timer-modal";
 
-function toDateTimeLocal(value: string | null | undefined) {
-  if (!value) return "";
-  const parsed = parseErpDateTime(value);
-  if (!parsed) {
-    return value.replace(" ", "T").slice(0, 16);
-  }
-
-  const year = parsed.getFullYear();
-  const month = String(parsed.getMonth() + 1).padStart(2, "0");
-  const day = String(parsed.getDate()).padStart(2, "0");
-  const hour = String(parsed.getHours()).padStart(2, "0");
-  const minute = String(parsed.getMinutes()).padStart(2, "0");
-  return `${year}-${month}-${day}T${hour}:${minute}`;
+function toDateTimeLocal(value: string | null | undefined, utcValue?: string | null) {
+  return formatDateTimeLocalInput(value, utcValue);
 }
 
 function fromDateTimeLocal(value: string) {
   return value.replace("T", " ") + ":00";
 }
 
-function parseErpDateTime(value: string) {
-  const match = value.match(
-    /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?(?:\.(\d+))?$/
-  );
-
-  if (!match) {
-    const fallback = new Date(value.includes("T") ? value : value.replace(" ", "T"));
-    return Number.isNaN(fallback.getTime()) ? null : fallback;
-  }
-
-  const [, year, month, day, hour, minute, second = "0", fraction = "0"] = match;
-  const milliseconds = Number(fraction.slice(0, 3).padEnd(3, "0"));
-  return new Date(
-    Number(year),
-    Number(month) - 1,
-    Number(day),
-    Number(hour),
-    Number(minute),
-    Number(second),
-    milliseconds
-  );
-}
-
-function formatEntryTime(value: string) {
-  const parsed = parseErpDateTime(value);
-  if (!parsed) return value;
-  return parsed.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+function formatEntryTime(value: string, utcValue?: string | null) {
+  return formatLocalDateTime(value, utcValue, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
 }
 
 function DraftEntriesList({
@@ -162,7 +132,7 @@ function DraftEntriesList({
             ) : (
               <>
                 <div className="muted-row time-range-row" style={{ marginTop: "0.8rem" }}>
-                  {formatEntryTime(entry.fromTime)} to {formatEntryTime(entry.toTime)}
+                  {formatEntryTime(entry.fromTime, entry.fromTimeUtc)} to {formatEntryTime(entry.toTime, entry.toTimeUtc)}
                 </div>
                 {entry.notes ? (
                   <p className="list-description task-supporting-copy" style={{ marginTop: "0.4rem", fontStyle: "italic" }}>
@@ -417,8 +387,8 @@ export function TimesheetScreen() {
 
   const handleEdit = (entry: DraftEntry) => {
     setEditingId(entry.timesheetDetailId);
-    setEditFrom(toDateTimeLocal(entry.fromTime));
-    setEditTo(toDateTimeLocal(entry.toTime));
+    setEditFrom(toDateTimeLocal(entry.fromTime, entry.fromTimeUtc));
+    setEditTo(toDateTimeLocal(entry.toTime, entry.toTimeUtc));
     setEditNotes(entry.notes || "");
   };
 
@@ -718,7 +688,7 @@ export function TimesheetScreen() {
                           </p>
                         ) : null}
                         <div className="muted-row time-range-row" style={{ marginTop: "0.8rem" }}>
-                          {entry.fromTime} {entry.toTime ? `to ${entry.toTime}` : "to now"}
+                          {formatEntryTime(entry.fromTime, entry.fromTimeUtc)} {entry.toTime ? `to ${formatEntryTime(entry.toTime, entry.toTimeUtc)}` : "to now"}
                         </div>
                       </article>
                     );

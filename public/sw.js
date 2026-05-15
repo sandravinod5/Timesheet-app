@@ -1,9 +1,34 @@
-const CACHE_NAME = "erpnext-timesheet-v3";
-const APP_SHELL = ["/", "/login", "/manifest.webmanifest", "/icon.svg"];
+const CACHE_NAME = "erpnext-timesheet-v4";
+const APP_SHELL = [
+  "/",
+  "/login",
+  "/manifest.webmanifest",
+  "/icon-192.png",
+  "/icon-512.png",
+  "/apple-touch-icon.png"
+];
+
+async function warmAppShell() {
+  const cache = await caches.open(CACHE_NAME);
+
+  await Promise.allSettled(
+    APP_SHELL.map(async (path) => {
+      const response = await fetch(path, { cache: "no-store" });
+
+      if (!response.ok) {
+        throw new Error(`Failed to cache ${path}: ${response.status}`);
+      }
+
+      await cache.put(path, response.clone());
+    })
+  );
+}
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)).then(() => self.skipWaiting())
+    warmAppShell()
+      .catch(() => undefined)
+      .then(() => self.skipWaiting())
   );
 });
 
@@ -11,9 +36,8 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)))
-    )
+    ).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 self.addEventListener("fetch", (event) => {
