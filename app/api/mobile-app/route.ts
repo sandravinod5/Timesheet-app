@@ -2,7 +2,24 @@ import { callErpNextMobileApp } from "@/lib/server/erpnext";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
-const ERP_TIME_ZONE = process.env.ERPNEXT_TIMEZONE || process.env.TZ || "UTC";
+function normalizeTimeZone(value?: string) {
+  const candidate = value?.trim().replace(/^:+/, "");
+  if (!candidate) {
+    return null;
+  }
+
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: candidate }).format(new Date());
+    return candidate;
+  } catch {
+    return null;
+  }
+}
+
+const ERP_TIME_ZONE =
+  normalizeTimeZone(process.env.ERPNEXT_TIMEZONE) ??
+  normalizeTimeZone(process.env.TZ) ??
+  "UTC";
 
 function toCamelCaseKey(value: string) {
   return value.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase());
