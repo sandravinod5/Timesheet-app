@@ -2197,6 +2197,10 @@ th {
   place-items: center;
   padding: 1.25rem;
   overflow: hidden;
+  background:
+    radial-gradient(circle at top left, rgba(59, 130, 246, 0.2), transparent 32%),
+    radial-gradient(circle at right 18%, rgba(125, 211, 252, 0.24), transparent 28%),
+    linear-gradient(180deg, #f8fbff 0%, #eef5ff 48%, #fdfefe 100%);
 }
 
 .auth-glow,
@@ -2205,7 +2209,7 @@ th {
   position: fixed;
   border-radius: 999px;
   filter: blur(64px);
-  opacity: 0.18;
+  opacity: 0.22;
   pointer-events: none;
 }
 
@@ -2214,7 +2218,7 @@ th {
   left: -3rem;
   width: 18rem;
   height: 18rem;
-  background: #667eea;
+  background: #2f80ff;
 }
 
 .auth-glow-alt {
@@ -2222,7 +2226,7 @@ th {
   right: -4rem;
   width: 16rem;
   height: 16rem;
-  background: #764ba2;
+  background: #6cc6ff;
 }
 
 .auth-glow-third {
@@ -2230,7 +2234,7 @@ th {
   left: 30%;
   width: 20rem;
   height: 20rem;
-  background: #39b1d7;
+  background: #9ad7ff;
 }
 
 .auth-card {
@@ -2238,6 +2242,13 @@ th {
   position: relative;
   z-index: 1;
   padding: 1.45rem 1.1rem 1.15rem;
+  border: 1px solid rgba(65, 125, 225, 0.14);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 251, 255, 0.94)),
+    linear-gradient(180deg, var(--surface-strong), var(--card-surface-end));
+  box-shadow:
+    0 28px 56px rgba(37, 99, 235, 0.12),
+    inset 1px 1px 0 rgba(255, 255, 255, 0.72);
 }
 
 .auth-brand-block {
@@ -2269,10 +2280,10 @@ th {
 }
 
 .auth-logo {
-  width: min(100%, 8rem);
+  width: min(100%, 8.8rem);
   height: auto;
   display: block;
-  filter: drop-shadow(0 12px 26px rgba(22, 101, 245, 0.12));
+  filter: drop-shadow(0 14px 30px rgba(22, 101, 245, 0.14));
 }
 
 .auth-form {
@@ -2280,13 +2291,61 @@ th {
   gap: 1rem;
 }
 
+.auth-form .eyebrow {
+  color: #2456a6;
+}
+
+.auth-form .input-shell {
+  border-color: rgba(65, 125, 225, 0.16);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.8),
+    0 10px 22px rgba(37, 99, 235, 0.06);
+}
+
+.auth-form .input-shell:focus-within {
+  border-color: rgba(22, 101, 245, 0.42);
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.8),
+    0 0 0 4px rgba(22, 101, 245, 0.12),
+    0 12px 26px rgba(37, 99, 235, 0.1);
+}
+
+.auth-form .input-shell input {
+  color: #15325b;
+}
+
+.auth-form .input-shell input::placeholder {
+  color: #7d93b8;
+}
+
+.password-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: 0;
+  padding: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #4f76b7;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.password-toggle:hover {
+  background: rgba(22, 101, 245, 0.08);
+  color: #1665f5;
+}
+
 .auth-submit-button {
-  background: linear-gradient(135deg, #1665f5, #1b78ff);
-  box-shadow: 0 10px 24px rgba(22, 101, 245, 0.28);
+  background: linear-gradient(135deg, #1d6cff, #44a6ff);
+  box-shadow: 0 12px 26px rgba(22, 101, 245, 0.24);
 }
 
 .auth-submit-button:hover {
-  box-shadow: 0 14px 28px rgba(22, 101, 245, 0.34);
+  box-shadow: 0 16px 32px rgba(22, 101, 245, 0.3);
 }
 
 .error-text {

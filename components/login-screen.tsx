@@ -2,12 +2,13 @@
 
 import Image from "next/image";
 import { useState } from "react";
-import { LoaderCircle } from "lucide-react";
+import { Eye, EyeOff, LoaderCircle } from "lucide-react";
 import { Button, InputShell, Panel } from "@/components/ui";
 
 export function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -72,12 +73,21 @@ export function LoginScreen() {
             <p className="eyebrow">Password</p>
             <InputShell>
               <input
-                type="password"
+                type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 placeholder="Enter your password"
                 autoComplete="current-password"
               />
+              <button
+                type="button"
+                className="password-toggle"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                aria-pressed={showPassword}
+                onClick={(e) => { e.preventDefault(); setShowPassword((current) => !current); }}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
             </InputShell>
           </div>
 
