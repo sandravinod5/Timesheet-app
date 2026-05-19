@@ -24,6 +24,7 @@ jobs:
           command_timeout: 30m
           script: |
             set -e
+            set -x
             cd /var/www/Timesheet-app
             git fetch origin main
             git reset --hard origin/main
@@ -35,21 +36,29 @@ jobs:
                 echo "ERROR: sudo requires password for this user. Configure passwordless sudo for systemctl."
                 exit 1
               fi
-              sudo -n systemctl list-unit-files | grep -q '^timesheet-app.service' || {
+              if ! sudo -n systemctl cat timesheet-app.service >/dev/null 2>&1; then
                 echo "ERROR: timesheet-app.service not found on server"
                 sudo -n systemctl list-unit-files | grep timesheet || true
                 exit 1
-              }
-              sudo -n systemctl restart timesheet-app.service
-              sudo -n systemctl --no-pager --full status timesheet-app.service || true
-              sudo -n journalctl -u timesheet-app.service -n 80 --no-pager || true
+              fi
+              if ! sudo -n systemctl restart timesheet-app.service; then
+                echo "ERROR: restart failed for timesheet-app.service"
+                sudo -n systemctl --no-pager --full status timesheet-app.service || true
+                sudo -n journalctl -u timesheet-app.service -n 120 --no-pager || true
+                exit 1
+              fi
+              sudo -n systemctl --no-pager --full status timesheet-app.service
             else
-              systemctl list-unit-files | grep -q '^timesheet-app.service' || {
+              if ! systemctl cat timesheet-app.service >/dev/null 2>&1; then
                 echo "ERROR: timesheet-app.service not found on server"
                 systemctl list-unit-files | grep timesheet || true
                 exit 1
-              }
-              systemctl restart timesheet-app.service
-              systemctl --no-pager --full status timesheet-app.service || true
-              journalctl -u timesheet-app.service -n 80 --no-pager || true
+              fi
+              if ! systemctl restart timesheet-app.service; then
+                echo "ERROR: restart failed for timesheet-app.service"
+                systemctl --no-pager --full status timesheet-app.service || true
+                journalctl -u timesheet-app.service -n 120 --no-pager || true
+                exit 1
+              fi
+              systemctl --no-pager --full status timesheet-app.service
             fi
