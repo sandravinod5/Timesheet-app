@@ -148,7 +148,7 @@ export async function loginToErpNext(email: string, password: string): Promise<S
 export function createSessionCookies(response: NextResponse, session: SessionData) {
   const encodedUser = encodeURIComponent(JSON.stringify(session.user));
 
-  response.cookies.set("task_mobile_user", JSON.stringify(session.user), {
+  response.cookies.set("task_mobile_user", encodedUser, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",

@@ -459,13 +459,8 @@ export function OverviewScreen() {
                         {formatWorkedTime(entry.hours)}
                       </span>
                     </div>
-<<<<<<< HEAD
-                    <div className="muted-row time-range-row" style={{ marginTop: "0.7rem" }}>
-                      {formatClockTime(entry.fromTime, entry.fromTimeUtc)} to {formatClockTime(entry.toTime, entry.toTimeUtc)}
-=======
                     <div className="muted-row time-range-row time-row-compact">
-                      {formatClockTime(entry.fromTime)} to {formatClockTime(entry.toTime)}
->>>>>>> 0ae4753 (Server-side direct updates)
+                      {formatClockTime(entry.fromTime, entry.fromTimeUtc)} to {formatClockTime(entry.toTime, entry.toTimeUtc)}
                     </div>
                   </article>
                 ))
@@ -511,13 +506,8 @@ export function OverviewScreen() {
                       <span>{entry.projectName || "No project"}</span>
                       <span>{entry.activityType || "Visit"}</span>
                     </div>
-<<<<<<< HEAD
-                    <div className="muted-row time-range-row" style={{ marginTop: "0.45rem" }}>
-                      {formatClockTime(entry.fromTime, entry.fromTimeUtc)} to {entry.toTime ? formatClockTime(entry.toTime, entry.toTimeUtc) : "Running"}
-=======
                     <div className="muted-row time-range-row meta-row-compact">
-                      {formatClockTime(entry.fromTime)} to {entry.toTime ? formatClockTime(entry.toTime) : "Running"}
->>>>>>> 0ae4753 (Server-side direct updates)
+                      {formatClockTime(entry.fromTime, entry.fromTimeUtc)} to {entry.toTime ? formatClockTime(entry.toTime, entry.toTimeUtc) : "Running"}
                     </div>
                   </article>
                 ))

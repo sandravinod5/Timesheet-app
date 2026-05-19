@@ -176,7 +176,19 @@ function parseSessionUser(cookieValue?: string) {
   try {
     return JSON.parse(cookieValue) as SessionUser;
   } catch {
-    return null;
+    try {
+      return JSON.parse(safeDecodeURIComponent(cookieValue)) as SessionUser;
+    } catch {
+      return null;
+    }
+  }
+}
+
+function safeDecodeURIComponent(value: string) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
   }
 }
 
@@ -346,7 +358,7 @@ async function handleRequest(request: NextRequest) {
     parseSessionUser(cookieStore.get("task_mobile_user")?.value) ??
     parseSessionUser(
       cookieStore.get("task_mobile_user_encoded")?.value
-        ? decodeURIComponent(cookieStore.get("task_mobile_user_encoded")!.value)
+        ? safeDecodeURIComponent(cookieStore.get("task_mobile_user_encoded")!.value)
         : undefined
     );
 

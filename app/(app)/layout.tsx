@@ -2,6 +2,14 @@ import { AppShell } from "@/components/app-shell";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
+function safeDecodeURIComponent(value: string) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
 export default async function AuthenticatedLayout({
   children
 }: Readonly<{
@@ -26,7 +34,7 @@ export default async function AuthenticatedLayout({
 
   if (hasEncodedUser?.value) {
     try {
-      user = JSON.parse(decodeURIComponent(hasEncodedUser.value)) as { email?: string; displayName?: string };
+      user = JSON.parse(safeDecodeURIComponent(hasEncodedUser.value)) as { email?: string; displayName?: string };
     } catch {
       user = null;
     }
@@ -36,7 +44,11 @@ export default async function AuthenticatedLayout({
     try {
       user = JSON.parse(hasUser.value) as { email?: string; displayName?: string };
     } catch {
-      user = null;
+      try {
+        user = JSON.parse(safeDecodeURIComponent(hasUser.value)) as { email?: string; displayName?: string };
+      } catch {
+        user = null;
+      }
     }
   }
 

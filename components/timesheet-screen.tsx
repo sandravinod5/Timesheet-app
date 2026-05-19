@@ -131,13 +131,8 @@ function DraftEntriesList({
               </div>
             ) : (
               <>
-<<<<<<< HEAD
-                <div className="muted-row time-range-row" style={{ marginTop: "0.8rem" }}>
-                  {formatEntryTime(entry.fromTime, entry.fromTimeUtc)} to {formatEntryTime(entry.toTime, entry.toTimeUtc)}
-=======
                 <div className="muted-row time-range-row time-row-spaced">
-                  {formatEntryTime(entry.fromTime)} to {formatEntryTime(entry.toTime)}
->>>>>>> 0ae4753 (Server-side direct updates)
+                  {formatEntryTime(entry.fromTime, entry.fromTimeUtc)} to {formatEntryTime(entry.toTime, entry.toTimeUtc)}
                 </div>
                 {entry.notes ? (
                   <p className="list-description task-supporting-copy description-note">
@@ -692,13 +687,8 @@ export function TimesheetScreen() {
                             {entry.notes}
                           </p>
                         ) : null}
-<<<<<<< HEAD
-                        <div className="muted-row time-range-row" style={{ marginTop: "0.8rem" }}>
-                          {formatEntryTime(entry.fromTime, entry.fromTimeUtc)} {entry.toTime ? `to ${formatEntryTime(entry.toTime, entry.toTimeUtc)}` : "to now"}
-=======
                         <div className="muted-row time-range-row time-row-spaced">
-                          {entry.fromTime} {entry.toTime ? `to ${entry.toTime}` : "to now"}
->>>>>>> 0ae4753 (Server-side direct updates)
+                          {formatEntryTime(entry.fromTime, entry.fromTimeUtc)} {entry.toTime ? `to ${formatEntryTime(entry.toTime, entry.toTimeUtc)}` : "to now"}
                         </div>
                       </article>
                     );
