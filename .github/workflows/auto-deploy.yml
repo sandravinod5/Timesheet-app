@@ -21,7 +21,9 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: ${{ secrets.DEPLOY_SERVER_PORT || 22 }}
           script_stop: true
+          command_timeout: 30m
           script: |
+            set -e
             cd /var/www/Timesheet-app
             git fetch origin main
             git reset --hard origin/main
@@ -29,6 +31,8 @@ jobs:
             npm run build
             if [ "$(id -u)" -ne 0 ]; then
               sudo -n systemctl restart timesheet-app.service
+              sudo -n systemctl --no-pager --full status timesheet-app.service
             else
               systemctl restart timesheet-app.service
+              systemctl --no-pager --full status timesheet-app.service
             fi
