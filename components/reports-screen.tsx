@@ -327,7 +327,7 @@ export function ReportsScreen() {
 
   return (
     <div className="screen-stack screen-stack--single report-dashboard">
-      <Panel>
+      <Panel className="report-top-panel">
         <div className="report-date-header">
           <h2 className="panel-title">My Reports</h2>
           <div className="report-date-filter">
@@ -421,7 +421,7 @@ export function ReportsScreen() {
         ) : null}
       </Panel>
 
-      <Panel>
+      <Panel className="report-insight-panel">
         <div className="panel-title-row">
           <div>
             <h2 className="panel-title">Insight Views</h2>
@@ -506,7 +506,7 @@ export function ReportsScreen() {
         </div>
       </Panel>
 
-      <Panel>
+      <Panel className="report-detail-panel">
         {selectedReport === "active_timer" ? (
           activeTimerRow ? (
             <div className="report-active-detail">

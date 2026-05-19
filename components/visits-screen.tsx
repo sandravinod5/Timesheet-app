@@ -522,7 +522,7 @@ export function VisitsScreen() {
   }
 
   return (
-    <div className="screen-stack screen-stack--single">
+    <div className="screen-stack screen-stack--single screen-stack-desktop-two visits-desktop-grid">
       <Panel className="visit-hero-panel">
         <div className="visit-hero">
           <div>
@@ -553,7 +553,7 @@ export function VisitsScreen() {
         </div>
       </Panel>
 
-      <Panel className="visit-calendar-panel">
+      <Panel className="visit-calendar-panel visits-calendar-main">
         <div className="visit-calendar-toolbar">
           <button
             type="button"
@@ -642,7 +642,7 @@ export function VisitsScreen() {
         </div>
       </Panel>
 
-      <Panel className="visit-month-schedule-panel">
+      <Panel className="visit-month-schedule-panel visits-schedule-side">
         <div className="visit-month-schedule-head">
           <div>
             <h3 className="panel-title">Scheduled Visits This Month</h3>

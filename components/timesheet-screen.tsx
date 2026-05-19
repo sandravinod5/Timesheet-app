@@ -108,7 +108,7 @@ function DraftEntriesList({
                     rows={3}
                   />
                 </div>
-                <div className="button-row" style={{ marginTop: "0.5rem" }}>
+                <div className="button-row button-row-compact">
                   <button
                     type="button"
                     className="timer-action-button timer-action-button-start"
@@ -131,11 +131,16 @@ function DraftEntriesList({
               </div>
             ) : (
               <>
+<<<<<<< HEAD
                 <div className="muted-row time-range-row" style={{ marginTop: "0.8rem" }}>
                   {formatEntryTime(entry.fromTime, entry.fromTimeUtc)} to {formatEntryTime(entry.toTime, entry.toTimeUtc)}
+=======
+                <div className="muted-row time-range-row time-row-spaced">
+                  {formatEntryTime(entry.fromTime)} to {formatEntryTime(entry.toTime)}
+>>>>>>> 0ae4753 (Server-side direct updates)
                 </div>
                 {entry.notes ? (
-                  <p className="list-description task-supporting-copy" style={{ marginTop: "0.4rem", fontStyle: "italic" }}>
+                  <p className="list-description task-supporting-copy description-note">
                     {entry.notes}
                   </p>
                 ) : null}
@@ -143,7 +148,7 @@ function DraftEntriesList({
             )}
 
             {!isEditing && (
-              <div className="button-row" style={{ marginTop: "0.8rem" }}>
+              <div className="button-row button-row-top">
                 <button type="button" className="timer-action-button" onClick={() => onEdit(entry)}>
                   <FileEdit size={15} />
                   Edit
@@ -162,7 +167,7 @@ function DraftEntriesList({
             )}
 
             {!entry.canSubmit && !isEditing && (
-              <p className="panel-subtitle" style={{ marginTop: "0.4rem", color: "var(--warning)" }}>
+              <p className="panel-subtitle warning-copy">
                 Timer still running in this timesheet - stop it first to submit.
               </p>
             )}
@@ -508,62 +513,10 @@ export function TimesheetScreen() {
     return <EmptyState title="Timesheets unavailable" copy={error || "No timesheet data was returned from the API."} />;
   }
 
-  return (
+      return (
     <>
-      <div className="screen-stack screen-stack--single">
-        <Panel>
-          <div className="panel-title-row panel-title-row-stack">
-            <button
-              type="button"
-              className="collapsible-header"
-              onClick={() => setDraftsOpen((open) => !open)}
-            >
-              <div className="collapsible-header-copy">
-                <h2 className="panel-title">Draft Entries</h2>
-                <p className="panel-subtitle">Review stopped timers, edit times if needed, then submit them.</p>
-              </div>
-              <div className="collapsible-header-meta">
-                <span className="collapsible-count">{drafts.length}</span>
-                <span className={`collapsible-chevron ${draftsOpen ? "is-open" : ""}`}>▼</span>
-              </div>
-            </button>
-          </div>
-
-          {draftError ? (
-            <p className="panel-subtitle" style={{ color: "var(--danger)", marginBottom: "0.75rem", wordBreak: "break-word" }}>
-              {draftError}
-            </p>
-          ) : null}
-
-          {draftsOpen ? (
-            <div className="collapsible-body">
-              {draftsLoading ? (
-                <LoadingState label="Loading draft entries..." />
-              ) : (
-                <DraftEntriesList
-                  drafts={drafts}
-                  onEdit={handleEdit}
-                  onSubmit={handleSubmitDraft}
-                  editingId={editingId}
-                  editFrom={editFrom}
-                  editTo={editTo}
-                  editNotes={editNotes}
-                  onEditFromChange={setEditFrom}
-                  onEditToChange={setEditTo}
-                  onEditNotesChange={setEditNotes}
-                  onSaveEdit={() => void handleSaveEdit()}
-                  onCancelEdit={() => {
-                    setEditingId(null);
-                    setEditNotes("");
-                  }}
-                  saving={draftSaving}
-                />
-              )}
-            </div>
-          ) : null}
-        </Panel>
-
-        <Panel>
+      <div className="screen-stack screen-stack--single screen-stack-desktop-two timesheet-desktop-grid">
+        <Panel className="timesheet-panel-primary">
           <div className="panel-title-row panel-title-row-stack">
             <button
               type="button"
@@ -599,7 +552,7 @@ export function TimesheetScreen() {
 
           {summaryOpen ? (
             <div className="collapsible-body">
-              <div className="button-row" style={{ marginBottom: "1rem" }}>
+              <div className="button-row toolbar-row">
                 <Button
                   type="button"
                   variant={notificationPermission === "granted" ? "secondary" : "primary"}
@@ -627,7 +580,59 @@ export function TimesheetScreen() {
           ) : null}
         </Panel>
 
-        <Panel>
+        <Panel className="timesheet-panel-secondary">
+          <div className="panel-title-row panel-title-row-stack">
+            <button
+              type="button"
+              className="collapsible-header"
+              onClick={() => setDraftsOpen((open) => !open)}
+            >
+              <div className="collapsible-header-copy">
+                <h2 className="panel-title">Draft Entries</h2>
+                <p className="panel-subtitle">Review stopped timers, edit times if needed, then submit them.</p>
+              </div>
+              <div className="collapsible-header-meta">
+                <span className="collapsible-count">{drafts.length}</span>
+                <span className={`collapsible-chevron ${draftsOpen ? "is-open" : ""}`}>▼</span>
+              </div>
+            </button>
+          </div>
+
+          {draftError ? (
+            <p className="panel-subtitle alert-copy">
+              {draftError}
+            </p>
+          ) : null}
+
+          {draftsOpen ? (
+            <div className="collapsible-body">
+              {draftsLoading ? (
+                <LoadingState label="Loading draft entries..." />
+              ) : (
+                <DraftEntriesList
+                  drafts={drafts}
+                  onEdit={handleEdit}
+                  onSubmit={handleSubmitDraft}
+                  editingId={editingId}
+                  editFrom={editFrom}
+                  editTo={editTo}
+                  editNotes={editNotes}
+                  onEditFromChange={setEditFrom}
+                  onEditToChange={setEditTo}
+                  onEditNotesChange={setEditNotes}
+                  onSaveEdit={() => void handleSaveEdit()}
+                  onCancelEdit={() => {
+                    setEditingId(null);
+                    setEditNotes("");
+                  }}
+                  saving={draftSaving}
+                />
+              )}
+            </div>
+          ) : null}
+        </Panel>
+
+        <Panel className="timesheet-panel-wide">
           <div className="panel-title-row panel-title-row-stack">
             <button
               type="button"
@@ -647,7 +652,7 @@ export function TimesheetScreen() {
 
           {timesheetsOpen ? (
             <div className="collapsible-body">
-              <div className="search-row" style={{ marginBottom: "1rem" }}>
+              <div className="search-row toolbar-row desktop-sticky-toolbar">
                 <InputShell className="search-field">
                   <Search size={18} color="var(--muted)" />
                   <input
@@ -683,12 +688,17 @@ export function TimesheetScreen() {
                         </div>
                         <p className="list-description task-supporting-copy">{entry.projectName || "No project"}</p>
                         {entry.notes ? (
-                          <p className="list-description task-supporting-copy" style={{ marginTop: "0.25rem", fontStyle: "italic" }}>
+                          <p className="list-description task-supporting-copy description-note">
                             {entry.notes}
                           </p>
                         ) : null}
+<<<<<<< HEAD
                         <div className="muted-row time-range-row" style={{ marginTop: "0.8rem" }}>
                           {formatEntryTime(entry.fromTime, entry.fromTimeUtc)} {entry.toTime ? `to ${formatEntryTime(entry.toTime, entry.toTimeUtc)}` : "to now"}
+=======
+                        <div className="muted-row time-range-row time-row-spaced">
+                          {entry.fromTime} {entry.toTime ? `to ${entry.toTime}` : "to now"}
+>>>>>>> 0ae4753 (Server-side direct updates)
                         </div>
                       </article>
                     );

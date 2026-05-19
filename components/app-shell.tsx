@@ -89,12 +89,30 @@ export function AppShell({ children, user }: AppShellProps) {
     });
   };
 
+  const renderNavButtons = (orientation: "mobile" | "desktop") =>
+    navItems.map((item) => {
+      const Icon = item.icon;
+      const active = pathname === item.href;
+
+      return (
+        <button
+          key={`${orientation}-${item.href}`}
+          className={active ? "nav-button active" : "nav-button"}
+          onClick={() => router.push(item.href)}
+          aria-current={active ? "page" : undefined}
+        >
+          <Icon size={20} />
+          <span className="nav-label">{item.label}</span>
+        </button>
+      );
+    });
+
   return (
     <div className="app-shell">
       <header className="app-header">
         <div className="header-card">
           <div className="brand">
-            <button className="brand-logo-wrap" onClick={() => router.push("/")} aria-label="Go to overview" type="button" style={{ background: "none", border: "none", padding: 0, cursor: "pointer" }}>
+            <button className="brand-logo-wrap brand-logo-button" onClick={() => router.push("/")} aria-label="Go to overview" type="button">
               <Image src="/marks-leaps.png" alt="Marks and Leaps logo" width={150} height={66} className="brand-logo" priority />
             </button>
             <div className="header-actions">
@@ -136,28 +154,21 @@ export function AppShell({ children, user }: AppShellProps) {
         </div>
       </header>
 
-      <main className="app-main">{children}</main>
+      <div className="app-layout">
+        <aside className="desktop-sidebar" aria-label="Primary navigation">
+          <nav className="desktop-nav-rail" aria-label="Primary desktop">
+            <div className="desktop-nav-grid">{renderNavButtons("desktop")}</div>
+          </nav>
+        </aside>
+
+        <main className="app-main">
+          <div className="app-main-inner">{children}</div>
+        </main>
+      </div>
 
       <div className="nav-wrap">
         <nav className="nav-rail" aria-label="Primary">
-          <div className="nav-grid">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const active = pathname === item.href;
-
-              return (
-                <button
-                  key={item.href}
-                  className={active ? "nav-button active" : "nav-button"}
-                  onClick={() => router.push(item.href)}
-                  aria-current={active ? "page" : undefined}
-                >
-                  <Icon size={20} />
-                  <span className="nav-label">{item.label}</span>
-                </button>
-              );
-            })}
-          </div>
+          <div className="nav-grid">{renderNavButtons("mobile")}</div>
         </nav>
       </div>
     </div>

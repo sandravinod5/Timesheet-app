@@ -1,0 +1,16 @@
+[Unit]
+Description=Timesheet Next.js app
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/var/www/Timesheet-app
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=/usr/bin/npm run start -- --hostname 127.0.0.1 --port 3000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

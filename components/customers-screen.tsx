@@ -53,7 +53,7 @@ export function CustomersScreen() {
                   <span className="badge badge-assigned">{formatHours(customer.totalHours)}</span>
                 </div>
 
-                <div className="metric-grid metric-grid--customer" style={{ marginTop: "1rem" }}>
+                <div className="metric-grid metric-grid--customer toolbar-row">
                   <article className="metric-card">
                     <span className="metric-label">Tasks</span>
                     <span className="metric-value">{customer.taskCount}</span>

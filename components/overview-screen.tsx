@@ -285,7 +285,8 @@ export function OverviewScreen() {
 
   return (
     <>
-      <div className="screen-stack">
+      <div className="screen-stack overview-stack">
+        <div className="overview-top-grid full-width">
         <Panel>
           <div className="panel-title-row">
             <div>
@@ -306,7 +307,7 @@ export function OverviewScreen() {
                     {timerRunning ? (
                       <>
                         <p className="timer-meta">{data.runningTimer?.taskSubject}</p>
-                        <p className="panel-subtitle" style={{ marginTop: "0.25rem", fontSize: "0.8rem" }}>
+                        <p className="panel-subtitle timer-running-subtitle">
                           {data.runningTimer?.customerName || "No customer"}
                           {data.runningTimer?.activityType ? ` | ${data.runningTimer.activityType}` : ""}
                         </p>
@@ -348,7 +349,7 @@ export function OverviewScreen() {
             </div>
           </div>
 
-          <div className="metric-grid" style={{ marginBottom: "1rem" }}>
+          <div className="metric-grid report-kpi-grid">
             <article className="metric-card">
               <div className="metric-top">
                 <span className="metric-label">Tracked</span>
@@ -369,15 +370,15 @@ export function OverviewScreen() {
             </article>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.5rem" }}>
+          <div className="report-summary">
             <span className="metric-label">
               {shortHours > 0 ? (
-                <span style={{ color: "var(--danger)", fontWeight: 700 }}>{formatHours(shortHours)} short</span>
+                <span className="short-hours">{formatHours(shortHours)} short</span>
               ) : (
-                <span style={{ color: "var(--success)", fontWeight: 700 }}>On track</span>
+                <span className="on-track-hours">On track</span>
               )}
             </span>
-            <span className="metric-label" style={{ fontVariantNumeric: "tabular-nums" }}>
+            <span className="metric-label ratio-value">
               {Math.round(trackedRatio)}%
             </span>
           </div>
@@ -393,6 +394,7 @@ export function OverviewScreen() {
             />
           </div>
         </Panel>
+        </div>
 
         <Panel className="full-width">
           <div className="panel-title-row">
@@ -420,7 +422,7 @@ export function OverviewScreen() {
           </div>
         </Panel>
 
-        <Panel className="full-width">
+        <Panel className="overview-recent-panel">
           <button
             type="button"
             className="collapsible-header"
@@ -457,8 +459,13 @@ export function OverviewScreen() {
                         {formatWorkedTime(entry.hours)}
                       </span>
                     </div>
+<<<<<<< HEAD
                     <div className="muted-row time-range-row" style={{ marginTop: "0.7rem" }}>
                       {formatClockTime(entry.fromTime, entry.fromTimeUtc)} to {formatClockTime(entry.toTime, entry.toTimeUtc)}
+=======
+                    <div className="muted-row time-range-row time-row-compact">
+                      {formatClockTime(entry.fromTime)} to {formatClockTime(entry.toTime)}
+>>>>>>> 0ae4753 (Server-side direct updates)
                     </div>
                   </article>
                 ))
@@ -467,7 +474,7 @@ export function OverviewScreen() {
           ) : null}
         </Panel>
 
-        <Panel className="full-width">
+        <Panel className="overview-recent-panel">
           <button
             type="button"
             className="collapsible-header"
@@ -500,12 +507,17 @@ export function OverviewScreen() {
                       </div>
                       <span className="badge badge-progress">{formatWorkedTime(entry.hours)}</span>
                     </div>
-                    <div className="muted-row list-meta-wrap" style={{ marginTop: "0.7rem" }}>
+                    <div className="muted-row list-meta-wrap time-row-compact">
                       <span>{entry.projectName || "No project"}</span>
                       <span>{entry.activityType || "Visit"}</span>
                     </div>
+<<<<<<< HEAD
                     <div className="muted-row time-range-row" style={{ marginTop: "0.45rem" }}>
                       {formatClockTime(entry.fromTime, entry.fromTimeUtc)} to {entry.toTime ? formatClockTime(entry.toTime, entry.toTimeUtc) : "Running"}
+=======
+                    <div className="muted-row time-range-row meta-row-compact">
+                      {formatClockTime(entry.fromTime)} to {entry.toTime ? formatClockTime(entry.toTime) : "Running"}
+>>>>>>> 0ae4753 (Server-side direct updates)
                     </div>
                   </article>
                 ))

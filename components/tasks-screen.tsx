@@ -83,7 +83,7 @@ export function TasksScreen() {
       </Panel>
 
       <Panel>
-        <div className="search-row filter-toolbar" style={{ marginBottom: "0.9rem" }}>
+        <div className="search-row filter-toolbar toolbar-row desktop-sticky-toolbar">
           <InputShell className="search-field">
             <Search size={18} color="var(--muted)" />
             <input
@@ -123,7 +123,7 @@ export function TasksScreen() {
                   Project: {task.projectName || "No project"} | Owner: {task.ownerName || "Not set"}
                 </p>
 
-                <div className="list-meta muted-row list-meta-wrap" style={{ marginTop: "0.85rem" }}>
+                <div className="list-meta muted-row list-meta-wrap meta-row-spaced">
                   <span>ID {task.taskId}</span>
                   <span>Due {task.expEndDate || "-"}</span>
                   <span>{task.customProjectType || "General"}</span>

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 const CACHE_NAME = "erpnext-timesheet-v4";
 const APP_SHELL = [
   "/",
@@ -23,6 +24,10 @@ async function warmAppShell() {
     })
   );
 }
+=======
+const CACHE_NAME = "erpnext-timesheet-v6";
+const APP_SHELL = ["/login", "/manifest.webmanifest", "/icon.svg", "/icon.png"];
+>>>>>>> 0ae4753 (Server-side direct updates)
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -40,20 +45,77 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+function isCacheable(response) {
+  return Boolean(response && response.ok && response.status === 200 && response.type === "basic");
+}
+
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") {
     return;
   }
 
+  const url = new URL(event.request.url);
+  if (url.origin !== self.location.origin) {
+    return;
+  }
+
+  const isNavigation = event.request.mode === "navigate";
+  const isNextStatic = url.pathname.startsWith("/_next/static/");
+
+  if (isNavigation) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (isCacheable(response)) {
+            const cloned = response.clone();
+            void caches.open(CACHE_NAME).then((cache) => cache.put(event.request, cloned));
+          }
+          return response;
+        })
+        .catch(() =>
+          caches.match(event.request).then((cached) => cached || caches.match("/login"))
+        )
+    );
+    return;
+  }
+
+  if (isNextStatic) {
+    // Prevent stale chunk references across deployments: prefer network for build assets.
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (isCacheable(response)) {
+            const cloned = response.clone();
+            void caches.open(CACHE_NAME).then((cache) => cache.put(event.request, cloned));
+          }
+          return response;
+        })
+        .catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
   event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        const cloned = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, cloned));
+    caches.match(event.request).then((cached) => {
+      if (cached) {
+        return cached;
+      }
+
+      return fetch(event.request).then((response) => {
+        if (isCacheable(response)) {
+          const cloned = response.clone();
+          void caches.open(CACHE_NAME).then((cache) => cache.put(event.request, cloned));
+        }
         return response;
-      })
-      .catch(() => caches.match(event.request).then((cached) => cached || caches.match("/")))
+      });
+    })
   );
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener("push", (event) => {
