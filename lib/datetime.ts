@@ -118,7 +118,21 @@ export function getLocalDateInputValue(date = new Date()) {
 }
 
 export function getElapsedSeconds(fromTime?: string | null, fromTimeUtc?: string | null) {
-  const start = parseApiDateTime(fromTime, fromTimeUtc);
+  const startFromUtc = fromTimeUtc ? parseApiDateTime(undefined, fromTimeUtc) : null;
+  const startFromLocal = fromTime ? parseApiDateTime(fromTime, undefined) : null;
+
+  // In multi-timezone deployments, backend-derived UTC can be offset when a
+  // naive local timestamp is converted with a single server timezone setting.
+  // If both exist and significantly disagree, trust the local timestamp for
+  // elapsed timer calculations.
+  let start = startFromUtc ?? startFromLocal;
+  if (startFromUtc && startFromLocal) {
+    const driftSeconds = Math.abs(startFromUtc.getTime() - startFromLocal.getTime()) / 1000;
+    if (driftSeconds >= 10 * 60) {
+      start = startFromLocal;
+    }
+  }
+
   if (!start) {
     return 0;
   }
