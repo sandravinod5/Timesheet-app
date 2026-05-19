@@ -105,7 +105,7 @@ export function LoginScreen() {
           </Button>
         </form>
 
-        <p className="auth-hint">Protected employee access for Marks & Leaps.</p>
+        <p className="auth-hint">Protected employee access for Marks & Leaps</p>
       </Panel>
     </div>
   );
