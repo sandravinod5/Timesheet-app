@@ -1,0 +1,35 @@
+name: Deploy Next.js app
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v0.1.8
+        with:
+          host: ${{ secrets.DEPLOY_SERVER_HOST }}
+          username: ${{ secrets.DEPLOY_SERVER_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_SERVER_PORT || 22 }}
+          script_stop: true
+          script: |
+            cd /var/www/Timesheet-app
+            git fetch origin main
+            git reset --hard origin/main
+            npm ci
+            npm run build
+            if [ "$(id -u)" -ne 0 ]; then
+              sudo -n systemctl restart timesheet-app.service
+            else
+              systemctl restart timesheet-app.service
+            fi
