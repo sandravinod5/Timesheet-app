@@ -1,4 +1,4 @@
-const CACHE_NAME = "erpnext-timesheet-v7";
+const CACHE_NAME = "erpnext-timesheet-v8";
 const APP_SHELL = ["/login", "/manifest.webmanifest", "/icon.svg", "/icon.png"];
 
 async function warmAppShell() {
@@ -53,18 +53,11 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (isNavigation) {
+    // Never cache HTML navigations for Next.js app routes.
+    // Caching route HTML can reference stale _next chunk URLs after deploy,
+    // causing client-side 404 and "Application error" crashes.
     event.respondWith(
-      fetch(event.request)
-        .then((response) => {
-          if (isCacheable(response)) {
-            const cloned = response.clone();
-            void caches.open(CACHE_NAME).then((cache) => cache.put(event.request, cloned));
-          }
-          return response;
-        })
-        .catch(() =>
-          caches.match(event.request).then((cached) => cached || caches.match("/login"))
-        )
+      fetch(event.request).catch(() => caches.match("/login"))
     );
     return;
   }

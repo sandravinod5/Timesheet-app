@@ -6,12 +6,13 @@ import {
   CheckCircle2,
   ChevronDown,
   Clock3,
+  RefreshCw,
   Square,
   Target,
   TrendingUp
 } from "lucide-react";
 import { fetchAction } from "@/lib/client";
-import { formatLocalDateTime, formatLocalTime, getElapsedSeconds, parseApiDateTime } from "@/lib/datetime";
+import { formatLocalTime, getElapsedSeconds, parseApiDateTime } from "@/lib/datetime";
 import { showSystemNotification } from "@/lib/notifications";
 import type { ActivityTypesData, OverviewData, Task, TimesheetsData } from "@/lib/types";
 import { formatDuration, formatHours, formatWorkedTime, statusBadgeClass } from "@/lib/utils";
@@ -71,7 +72,6 @@ export function OverviewScreen() {
   const [elapsed, setElapsed] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
-  const [deviceNow, setDeviceNow] = useState(new Date());
   const driftWarningRef = useRef<string | null>(null);
 
   const load = async (options?: { silent?: boolean }) => {
@@ -154,11 +154,6 @@ export function OverviewScreen() {
       window.removeEventListener("focus", onVisibilityChange);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, []);
-
-  useEffect(() => {
-    const clock = window.setInterval(() => setDeviceNow(new Date()), 1000);
-    return () => window.clearInterval(clock);
   }, []);
 
   useEffect(() => {
@@ -328,8 +323,6 @@ export function OverviewScreen() {
   }
 
   const timerRunning = Boolean(data.runningTimer);
-  const deviceTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "Unknown";
-  const serverNowLabel = data.serverNowUtc ? formatLocalDateTime(undefined, data.serverNowUtc) : "Unavailable";
   const kpis = [
     {
       key: "assigned",
@@ -378,8 +371,13 @@ export function OverviewScreen() {
                     : "Not synced yet"}
               </p>
             </div>
-            <button className="timer-action-button" onClick={() => void load({ silent: true })}>
-              Sync now
+            <button
+              className="timer-action-button"
+              onClick={() => void load({ silent: true })}
+              title="Sync now"
+              aria-label="Sync now"
+            >
+              <RefreshCw size={16} />
             </button>
           </div>
 
@@ -483,44 +481,6 @@ export function OverviewScreen() {
           </div>
         </Panel>
 
-        <Panel>
-          <div className="panel-title-row">
-            <div>
-              <h2 className="panel-title">Time Diagnostics</h2>
-              <p className="panel-subtitle">Use this to verify timezone and current clock alignment.</p>
-            </div>
-          </div>
-          <div className="list-stack">
-            <article className="list-card">
-              <div className="list-head">
-                <div className="list-head-copy">
-                  <h4 className="list-title">Device timezone</h4>
-                  <p className="panel-subtitle">{deviceTimeZone}</p>
-                </div>
-                <span className="badge badge-progress">Browser</span>
-              </div>
-              <p className="list-description task-supporting-copy">Current device time: {deviceNow.toLocaleString()}</p>
-            </article>
-            <article className="list-card">
-              <div className="list-head">
-                <div className="list-head-copy">
-                  <h4 className="list-title">Server now (from API)</h4>
-                  <p className="panel-subtitle">{serverNowLabel}</p>
-                </div>
-                <span className="badge badge-complete">API</span>
-              </div>
-              {data.runningTimer ? (
-                <p className="list-description task-supporting-copy">
-                  Timer source: local `{data.runningTimer.fromTime || "-"}`
-                  {" | "}utc `{data.runningTimer.fromTimeUtc || "-"}`
-                  {" | "}liveHours `{typeof data.runningTimer.liveHours === "number" ? data.runningTimer.liveHours.toFixed(2) : "-"}`
-                </p>
-              ) : (
-                <p className="list-description task-supporting-copy">No running timer right now.</p>
-              )}
-            </article>
-          </div>
-        </Panel>
         </div>
 
         <Panel className="full-width">
