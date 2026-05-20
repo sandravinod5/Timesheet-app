@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   CheckCircle2,
@@ -11,7 +11,7 @@ import {
   TrendingUp
 } from "lucide-react";
 import { fetchAction } from "@/lib/client";
-import { formatLocalTime, getElapsedSeconds } from "@/lib/datetime";
+import { formatLocalDateTime, formatLocalTime, getElapsedSeconds, parseApiDateTime } from "@/lib/datetime";
 import { showSystemNotification } from "@/lib/notifications";
 import type { ActivityTypesData, OverviewData, Task, TimesheetsData } from "@/lib/types";
 import { formatDuration, formatHours, formatWorkedTime, statusBadgeClass } from "@/lib/utils";
@@ -71,6 +71,8 @@ export function OverviewScreen() {
   const [elapsed, setElapsed] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
+  const [deviceNow, setDeviceNow] = useState(new Date());
+  const driftWarningRef = useRef<string | null>(null);
 
   const load = async (options?: { silent?: boolean }) => {
     const silent = Boolean(options?.silent);
@@ -155,19 +157,57 @@ export function OverviewScreen() {
   }, []);
 
   useEffect(() => {
+    const clock = window.setInterval(() => setDeviceNow(new Date()), 1000);
+    return () => window.clearInterval(clock);
+  }, []);
+
+  useEffect(() => {
     if (!data?.runningTimer?.fromTime) {
       setElapsed(0);
       return;
     }
 
     const run = () => {
-      setElapsed(getElapsedSeconds(data.runningTimer?.fromTime, data.runningTimer?.fromTimeUtc));
+      setElapsed(
+        getElapsedSeconds(
+          data.runningTimer?.fromTime,
+          data.runningTimer?.fromTimeUtc,
+          data.runningTimer?.liveHours,
+          data.serverNowUtc
+        )
+      );
     };
 
     run();
     const timer = window.setInterval(run, 1000);
     return () => window.clearInterval(timer);
-  }, [data?.runningTimer?.fromTime, data?.runningTimer?.fromTimeUtc]);
+  }, [data?.runningTimer?.fromTime, data?.runningTimer?.fromTimeUtc, data?.runningTimer?.liveHours, data?.serverNowUtc]);
+
+  useEffect(() => {
+    const rt = data?.runningTimer;
+    if (!rt || typeof rt.liveHours !== "number") {
+      return;
+    }
+
+    const localStart = parseApiDateTime(rt.fromTime);
+    const utcStart = parseApiDateTime(undefined, rt.fromTimeUtc);
+    if (!localStart || !utcStart) {
+      return;
+    }
+
+    const driftMinutes = Math.round(Math.abs(localStart.getTime() - utcStart.getTime()) / 60000);
+    if (driftMinutes >= 20) {
+      const key = `${rt.timesheetDetailId}:${driftMinutes}`;
+      if (driftWarningRef.current !== key) {
+        driftWarningRef.current = key;
+        showToast({
+          title: "Timer timezone mismatch detected",
+          message: `Detected ${driftMinutes} minute drift between local and UTC timer fields. Using ERP live hours.`,
+          variant: "error"
+        });
+      }
+    }
+  }, [data?.runningTimer, showToast]);
 
   const expectedHours = useMemo(() => {
     if (!data) {
@@ -288,6 +328,8 @@ export function OverviewScreen() {
   }
 
   const timerRunning = Boolean(data.runningTimer);
+  const deviceTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "Unknown";
+  const serverNowLabel = data.serverNowUtc ? formatLocalDateTime(undefined, data.serverNowUtc) : "Unavailable";
   const kpis = [
     {
       key: "assigned",
@@ -438,6 +480,45 @@ export function OverviewScreen() {
                   : "linear-gradient(90deg, var(--primary), var(--accent))"
               }}
             />
+          </div>
+        </Panel>
+
+        <Panel>
+          <div className="panel-title-row">
+            <div>
+              <h2 className="panel-title">Time Diagnostics</h2>
+              <p className="panel-subtitle">Use this to verify timezone and current clock alignment.</p>
+            </div>
+          </div>
+          <div className="list-stack">
+            <article className="list-card">
+              <div className="list-head">
+                <div className="list-head-copy">
+                  <h4 className="list-title">Device timezone</h4>
+                  <p className="panel-subtitle">{deviceTimeZone}</p>
+                </div>
+                <span className="badge badge-progress">Browser</span>
+              </div>
+              <p className="list-description task-supporting-copy">Current device time: {deviceNow.toLocaleString()}</p>
+            </article>
+            <article className="list-card">
+              <div className="list-head">
+                <div className="list-head-copy">
+                  <h4 className="list-title">Server now (from API)</h4>
+                  <p className="panel-subtitle">{serverNowLabel}</p>
+                </div>
+                <span className="badge badge-complete">API</span>
+              </div>
+              {data.runningTimer ? (
+                <p className="list-description task-supporting-copy">
+                  Timer source: local `{data.runningTimer.fromTime || "-"}`
+                  {" | "}utc `{data.runningTimer.fromTimeUtc || "-"}`
+                  {" | "}liveHours `{typeof data.runningTimer.liveHours === "number" ? data.runningTimer.liveHours.toFixed(2) : "-"}`
+                </p>
+              ) : (
+                <p className="list-description task-supporting-copy">No running timer right now.</p>
+              )}
+            </article>
           </div>
         </Panel>
         </div>

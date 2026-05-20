@@ -302,12 +302,25 @@ export function ReportsScreen() {
     }
 
     const run = () => {
-      setTimerElapsed(getElapsedSeconds(fromTime, kpiCards?.activeTimer?.fromTimeUtc));
+      setTimerElapsed(
+        getElapsedSeconds(
+          fromTime,
+          kpiCards?.activeTimer?.fromTimeUtc,
+          kpiCards?.activeTimer?.liveHours,
+          dashboardPayload?.serverNowUtc ?? detailPayload?.serverNowUtc
+        )
+      );
     };
     run();
     const interval = window.setInterval(run, 1000);
     return () => window.clearInterval(interval);
-  }, [kpiCards?.activeTimer?.fromTime, kpiCards?.activeTimer?.fromTimeUtc]);
+  }, [
+    kpiCards?.activeTimer?.fromTime,
+    kpiCards?.activeTimer?.fromTimeUtc,
+    kpiCards?.activeTimer?.liveHours,
+    dashboardPayload?.serverNowUtc,
+    detailPayload?.serverNowUtc
+  ]);
   const hoursByDay =
     dashboardPayload?.hoursByDay ||
     dashboardPayload?.summary?.hoursByDay ||

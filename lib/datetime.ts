@@ -117,7 +117,23 @@ export function getLocalDateInputValue(date = new Date()) {
   return `${year}-${month}-${day}`;
 }
 
-export function getElapsedSeconds(fromTime?: string | null, fromTimeUtc?: string | null) {
+export function getElapsedSeconds(
+  fromTime?: string | null,
+  fromTimeUtc?: string | null,
+  liveHours?: number | null,
+  serverNowUtc?: string | null
+) {
+  if (typeof liveHours === "number" && Number.isFinite(liveHours) && liveHours >= 0) {
+    const baseSeconds = Math.max(0, Math.floor(liveHours * 3600));
+    const serverNow = serverNowUtc ? parseApiDateTime(undefined, serverNowUtc) : null;
+    if (!serverNow) {
+      return baseSeconds;
+    }
+
+    const deltaSeconds = Math.max(0, Math.floor((Date.now() - serverNow.getTime()) / 1000));
+    return baseSeconds + deltaSeconds;
+  }
+
   const startFromUtc = fromTimeUtc ? parseApiDateTime(undefined, fromTimeUtc) : null;
   const startFromLocal = fromTime ? parseApiDateTime(fromTime, undefined) : null;
 
