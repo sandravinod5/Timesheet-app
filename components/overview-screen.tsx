@@ -69,6 +69,8 @@ export function OverviewScreen() {
   const [showTimerModal, setShowTimerModal] = useState(false);
   const [recentTimesheetsOpen, setRecentTimesheetsOpen] = useState(false);
   const [recentVisitsOpen, setRecentVisitsOpen] = useState(false);
+  const [recentTaskWorkOpen, setRecentTaskWorkOpen] = useState(false);
+  const [expandedTaskWorkKey, setExpandedTaskWorkKey] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
@@ -236,6 +238,70 @@ export function OverviewScreen() {
   const recentClientVisits = useMemo(() => {
     return data?.recentClientVisits ?? [];
   }, [data]);
+
+  const recentTaskWork = useMemo(() => {
+    const rows = recent?.timesheets?.filter((entry) => !entry.isRunning) ?? [];
+    const grouped = new Map<
+      string,
+      {
+        key: string;
+        taskSubject: string;
+        taskId: string;
+        dateKey: string;
+        dateLabel: string;
+        totalHours: number;
+        lastWorkedAt: number;
+        entries: typeof rows;
+      }
+    >();
+
+    for (const entry of rows) {
+      const parsed = parseApiDateTime(entry.toTime || entry.fromTime, entry.toTimeUtc || entry.fromTimeUtc);
+      if (!parsed) {
+        continue;
+      }
+
+      const yyyy = parsed.getFullYear();
+      const mm = String(parsed.getMonth() + 1).padStart(2, "0");
+      const dd = String(parsed.getDate()).padStart(2, "0");
+      const dateKey = `${yyyy}-${mm}-${dd}`;
+      const dateLabel = parsed.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
+      const taskId = entry.task || entry.taskSubject || entry.timesheetDetailId;
+      const taskSubject = entry.taskSubject || "No task";
+      const key = `${dateKey}|${taskId}`;
+      const existing = grouped.get(key);
+
+      if (!existing) {
+        grouped.set(key, {
+          key,
+          taskSubject,
+          taskId,
+          dateKey,
+          dateLabel,
+          totalHours: Number(entry.hours || 0),
+          lastWorkedAt: parsed.getTime(),
+          entries: [entry]
+        });
+        continue;
+      }
+
+      existing.totalHours = Number((existing.totalHours + Number(entry.hours || 0)).toFixed(2));
+      existing.lastWorkedAt = Math.max(existing.lastWorkedAt, parsed.getTime());
+      existing.entries = [...existing.entries, entry];
+    }
+
+    return Array.from(grouped.values())
+      .sort((a, b) => b.lastWorkedAt - a.lastWorkedAt)
+      .slice(0, 8)
+      .map((group) => ({
+        ...group,
+        entries: [...group.entries].sort((a, b) => {
+          const at = parseApiDateTime(a.toTime || a.fromTime, a.toTimeUtc || a.fromTimeUtc)?.getTime() ?? 0;
+          const bt = parseApiDateTime(b.toTime || b.fromTime, b.toTimeUtc || b.fromTimeUtc)?.getTime() ?? 0;
+          return bt - at;
+        })
+      }));
+  }, [recent?.timesheets]);
 
   const startTimer = async (task: Task, activityType: string) => {
     const taskId = task?.taskId?.trim();
@@ -507,6 +573,80 @@ export function OverviewScreen() {
               );
             })}
           </div>
+        </Panel>
+
+        <Panel className="overview-recent-panel">
+          <button
+            type="button"
+            className="collapsible-header"
+            onClick={() => setRecentTaskWorkOpen((current) => !current)}
+            aria-expanded={recentTaskWorkOpen}
+          >
+            <div className="collapsible-header-copy">
+              <h2 className="panel-title">Recent Task Work</h2>
+              <p className="panel-subtitle">
+                Daily task work summary. Tap any row to view timesheet entries for that task on that day.
+              </p>
+            </div>
+            <div className="collapsible-header-meta">
+              <span className="collapsible-count">{recentTaskWork.length}</span>
+              <ChevronDown size={18} className={`collapsible-chevron ${recentTaskWorkOpen ? "is-open" : ""}`} />
+            </div>
+          </button>
+
+          {recentTaskWorkOpen ? (
+            <div className="list-stack collapsible-body">
+              {recentError ? (
+                <EmptyState title="Task work unavailable" copy={recentError} />
+              ) : recentTaskWork.length === 0 ? (
+                <EmptyState title="No recent task work" copy="No completed task entries found yet." />
+              ) : (
+                recentTaskWork.map((group, idx) => {
+                  const isOpen = expandedTaskWorkKey === group.key;
+                  return (
+                    <article key={group.key} className="list-card">
+                      <button
+                        type="button"
+                        className="collapsible-header"
+                        onClick={() => setExpandedTaskWorkKey(isOpen ? null : group.key)}
+                        aria-expanded={isOpen}
+                      >
+                        <div className="collapsible-header-copy">
+                          <h4 className="list-title">{group.taskSubject}</h4>
+                          <p className="panel-subtitle">
+                            {group.dateLabel}
+                            {idx === 0 ? " | Last worked task" : ""}
+                          </p>
+                        </div>
+                        <div className="collapsible-header-meta">
+                          <span className="badge badge-complete">{formatWorkedTime(group.totalHours)}</span>
+                          <ChevronDown size={16} className={`collapsible-chevron ${isOpen ? "is-open" : ""}`} />
+                        </div>
+                      </button>
+                      {isOpen ? (
+                        <div className="list-stack collapsible-body">
+                          {group.entries.map((entry) => (
+                            <article key={entry.timesheetDetailId} className="list-card">
+                              <div className="list-head">
+                                <div className="list-head-copy">
+                                  <h4 className="list-title">{entry.customerName || "No customer"}</h4>
+                                  <p className="panel-subtitle">{entry.activityType || entry.projectName || "General"}</p>
+                                </div>
+                                <span className="badge badge-progress">{formatWorkedTime(entry.hours)}</span>
+                              </div>
+                              <div className="muted-row time-range-row time-row-compact">
+                                {formatClockTime(entry.fromTime, entry.fromTimeUtc)} to {formatClockTime(entry.toTime, entry.toTimeUtc)}
+                              </div>
+                            </article>
+                          ))}
+                        </div>
+                      ) : null}
+                    </article>
+                  );
+                })
+              )}
+            </div>
+          ) : null}
         </Panel>
 
         <Panel className="overview-recent-panel">
