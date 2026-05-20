@@ -460,7 +460,7 @@ textarea:focus-visible {
   border: 0;
   background: transparent;
   color: #fff;
-  width: 1.9rem;
+  width: 2.25rem;
   height: 1.9rem;
   border-radius: 999px;
   display: inline-flex;
@@ -482,6 +482,10 @@ textarea:focus-visible {
 
 .sync-icon-button.is-syncing svg {
   animation: sync-spin 0.9s linear infinite;
+}
+
+[data-theme="light"] .sync-icon-button {
+  color: #111;
 }
 
 @keyframes sync-spin {
