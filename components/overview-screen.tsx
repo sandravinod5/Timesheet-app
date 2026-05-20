@@ -372,7 +372,7 @@ export function OverviewScreen() {
               </p>
             </div>
             <button
-              className="timer-action-button"
+              className={`sync-icon-button ${syncing ? "is-syncing" : ""}`}
               onClick={() => void load({ silent: true })}
               title="Sync now"
               aria-label="Sync now"

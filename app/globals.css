@@ -456,6 +456,39 @@ textarea:focus-visible {
   align-items: stretch;
 }
 
+.sync-icon-button {
+  border: 0;
+  background: transparent;
+  color: #fff;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0.92;
+  transition: opacity 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
+}
+
+.sync-icon-button:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.sync-icon-button:active {
+  transform: scale(0.97);
+}
+
+.sync-icon-button.is-syncing svg {
+  animation: sync-spin 0.9s linear infinite;
+}
+
+@keyframes sync-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 .panel-title {
   margin: 0;
   font-size: 1.1rem;
