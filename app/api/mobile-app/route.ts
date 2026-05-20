@@ -388,7 +388,7 @@ async function handleRequest(request: NextRequest) {
         success: true,
         action,
         data: {
-          activityTypes: ["Working"]
+          activityTypes: [{ name: "Working", customParentGroup: "Internal (Others)" }]
         },
         error: null
       });

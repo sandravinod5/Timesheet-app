@@ -14,7 +14,7 @@ import {
 import { fetchAction } from "@/lib/client";
 import { formatLocalTime, getElapsedSeconds, parseApiDateTime } from "@/lib/datetime";
 import { showSystemNotification } from "@/lib/notifications";
-import type { ActivityTypesData, OverviewData, Task, TimesheetsData } from "@/lib/types";
+import type { ActivityTypeOption, ActivityTypesData, OverviewData, Task, TimesheetsData } from "@/lib/types";
 import { formatDuration, formatHours, formatWorkedTime, statusBadgeClass } from "@/lib/utils";
 import { EmptyState, LoadingState, OverviewSkeleton, Panel } from "@/components/ui";
 import { KpiModal } from "@/components/kpi-modal";
@@ -61,7 +61,7 @@ export function OverviewScreen() {
   const [data, setData] = useState<OverviewData | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [recent, setRecent] = useState<TimesheetsData | null>(null);
-  const [activityTypes, setActivityTypes] = useState<string[]>([]);
+  const [activityTypes, setActivityTypes] = useState<ActivityTypeOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [recentError, setRecentError] = useState<string | null>(null);
@@ -119,7 +119,12 @@ export function OverviewScreen() {
     }
 
     if (activityTypesResult.status === "fulfilled") {
-      setActivityTypes(activityTypesResult.value.data.activityTypes);
+      const mapped = (activityTypesResult.value.data.activityTypes || []).map((item) =>
+        typeof item === "string"
+          ? { name: item, customParentGroup: "Internal (Others)" }
+          : item
+      );
+      setActivityTypes(mapped);
     } else {
       setActivityTypes([]);
     }

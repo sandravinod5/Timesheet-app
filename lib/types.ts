@@ -128,7 +128,12 @@ export type ReportsData = {
 };
 
 export type ActivityTypesData = {
-  activityTypes: string[];
+  activityTypes: ActivityTypeOption[];
+};
+
+export type ActivityTypeOption = {
+  name: string;
+  customParentGroup?: string | null;
 };
 
 export type LeaveBreakdown = {

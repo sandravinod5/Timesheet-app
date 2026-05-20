@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { fetchAction } from "@/lib/client";
 import { formatDateTimeLocalInput, formatLocalDateTime } from "@/lib/datetime";
 import { requestNotificationPermission, shouldSendNotification, showSystemNotification, getNotificationPermissionState } from "@/lib/notifications";
-import type { ActivityTypesData, DraftEntry, DraftsData, Task, TimesheetsData } from "@/lib/types";
+import type { ActivityTypeOption, ActivityTypesData, DraftEntry, DraftsData, Task, TimesheetsData } from "@/lib/types";
 import { formatHours, formatWorkedTime } from "@/lib/utils";
 import { Button, EmptyState, InputShell, LoadingState, Panel } from "@/components/ui";
 import { useToast } from "@/components/toast-provider";
@@ -179,7 +179,7 @@ export function TimesheetScreen() {
   const { showToast } = useToast();
   const [payload, setPayload] = useState<TimesheetsData | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [activityTypes, setActivityTypes] = useState<string[]>([]);
+  const [activityTypes, setActivityTypes] = useState<ActivityTypeOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -251,7 +251,12 @@ export function TimesheetScreen() {
     }
 
     if (activityTypesResult.status === "fulfilled") {
-      setActivityTypes(activityTypesResult.value.data.activityTypes);
+      const mapped = (activityTypesResult.value.data.activityTypes || []).map((item) =>
+        typeof item === "string"
+          ? { name: item, customParentGroup: "Internal (Others)" }
+          : item
+      );
+      setActivityTypes(mapped);
     } else {
       setActivityTypes([]);
     }

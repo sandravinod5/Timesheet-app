@@ -1,9 +1,9 @@
 "use client";
 
-import { Search } from "lucide-react";
+import { Briefcase, Building2, CheckCircle2, ClipboardCheck, FileText, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { EmptyState, Modal } from "@/components/ui";
-import type { Task } from "@/lib/types";
+import type { ActivityTypeOption, Task } from "@/lib/types";
 import { statusBadgeClass } from "@/lib/utils";
 
 export function TimerModal({
@@ -15,12 +15,13 @@ export function TimerModal({
 }: {
   open: boolean;
   tasks: Task[];
-  activityTypes: string[];
+  activityTypes: ActivityTypeOption[];
   onClose: () => void;
   onStart: (task: Task, activityType: string, notes: string) => Promise<void>;
 }) {
   const [search, setSearch] = useState("");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [selectedParentGroup, setSelectedParentGroup] = useState<string | null>(null);
   const [selectedActivityType, setSelectedActivityType] = useState<string | null>(null);
   const [activitySearch, setActivitySearch] = useState("");
   const [notes, setNotes] = useState("");
@@ -46,6 +47,7 @@ export function TimerModal({
 
   const handleClose = () => {
     setSelectedTask(null);
+    setSelectedParentGroup(null);
     setSelectedActivityType(null);
     setSearch("");
     setActivitySearch("");
@@ -53,27 +55,59 @@ export function TimerModal({
     onClose();
   };
 
-  const availableActivityTypes = activityTypes.length > 0 ? activityTypes : ["Working"];
+  const availableActivityTypes =
+    activityTypes.length > 0 ? activityTypes : [{ name: "Working", customParentGroup: "Internal (Others)" }];
+
+  const parentConfig = [
+    { name: "Visit", icon: Building2 },
+    { name: "Internal (Others)", icon: Briefcase },
+    { name: "Review", icon: ClipboardCheck },
+    { name: "Finalisation", icon: CheckCircle2 },
+    { name: "Drafting", icon: FileText }
+  ] as const;
+
+  const parentGroups = useMemo(() => {
+    const defined = new Set(
+      availableActivityTypes
+        .map((item) => (item.customParentGroup || "").trim())
+        .filter(Boolean)
+    );
+
+    const ordered = parentConfig.filter((item) => defined.has(item.name));
+    const extras = [...defined]
+      .filter((value) => !parentConfig.some((item) => item.name === value))
+      .map((name) => ({ name, icon: Briefcase }));
+
+    return [...ordered, ...extras];
+  }, [availableActivityTypes]);
+
+  const selectedParentLabel = selectedParentGroup || parentGroups[0]?.name || "Internal (Others)";
+
   const filteredActivityTypes = useMemo(() => {
     const normalized = activitySearch.trim().toLowerCase();
+    const parentValue = (selectedParentGroup || "").trim().toLowerCase();
+
+    const typesForParent = availableActivityTypes
+      .filter((item) => (item.customParentGroup || "").trim().toLowerCase() === parentValue)
+      .map((item) => item.name);
 
     if (!normalized) {
-      return availableActivityTypes;
+      return typesForParent;
     }
 
-    return availableActivityTypes.filter((type) => type.toLowerCase().includes(normalized));
-  }, [activitySearch, availableActivityTypes]);
+    return typesForParent.filter((type) => type.toLowerCase().includes(normalized));
+  }, [activitySearch, availableActivityTypes, selectedParentGroup]);
 
   if (!open) {
     return null;
   }
 
-  // Step 3 — description + start
+  // Step 4 - description + start
   if (selectedTask && selectedActivityType) {
     return (
       <Modal
         title="Add Description"
-        subtitle={`${selectedTask.subject} · ${selectedActivityType}`}
+        subtitle={`${selectedTask.subject} | ${selectedParentLabel} | ${selectedActivityType}`}
         onClose={handleClose}
         onBack={() => {
           setSelectedActivityType(null);
@@ -103,15 +137,15 @@ export function TimerModal({
     );
   }
 
-  // Step 2 — activity type
-  if (selectedTask) {
+  // Step 3 - activity type
+  if (selectedTask && selectedParentGroup) {
     return (
       <Modal
         title="Select Activity Type"
-        subtitle={selectedTask.subject}
+        subtitle={`${selectedTask.subject} | ${selectedParentLabel}`}
         onClose={handleClose}
         onBack={() => {
-          setSelectedTask(null);
+          setSelectedParentGroup(null);
           setActivitySearch("");
         }}
       >
@@ -147,7 +181,40 @@ export function TimerModal({
     );
   }
 
-  // Step 1 — task selection
+  // Step 2 - parent group selection
+  if (selectedTask) {
+    return (
+      <Modal title="Select Parent Group" subtitle={selectedTask.subject} onClose={handleClose} onBack={() => setSelectedTask(null)}>
+        {parentGroups.length === 0 ? (
+          <EmptyState title="No parent groups found" copy="Please map activity types with custom_parent_group in Activity Type." />
+        ) : (
+          <div className="timer-parent-grid">
+            {parentGroups.map((parent) => {
+              const Icon = parent.icon;
+              return (
+                <button
+                  key={parent.name}
+                  className="list-card timer-parent-card"
+                  type="button"
+                  onClick={() => {
+                    setSelectedParentGroup(parent.name);
+                    setActivitySearch("");
+                  }}
+                >
+                  <div className="timer-parent-card-icon">
+                    <Icon size={20} />
+                  </div>
+                  <h4 className="list-title">{parent.name}</h4>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </Modal>
+    );
+  }
+
+  // Step 1 - task selection
   return (
     <Modal title="Start Timer" subtitle="Pick one of your active tasks" onClose={handleClose}>
       <label className="input-shell modal-search">
