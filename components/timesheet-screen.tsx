@@ -11,6 +11,8 @@ import { Button, EmptyState, InputShell, LoadingState, Panel } from "@/component
 import { useToast } from "@/components/toast-provider";
 import { TimerModal } from "@/components/timer-modal";
 
+const POLL_INTERVAL_MS = 15 * 1000;
+
 function toDateTimeLocal(value: string | null | undefined, utcValue?: string | null) {
   return formatDateTimeLocalInput(value, utcValue);
 }
@@ -195,22 +197,34 @@ export function TimesheetScreen() {
   const [summaryOpen, setSummaryOpen] = useState(true);
   const [timesheetsOpen, setTimesheetsOpen] = useState(true);
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | "unsupported">("unsupported");
+  const [syncing, setSyncing] = useState(false);
+  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
 
-  const loadDrafts = async () => {
-    setDraftsLoading(true);
+  const loadDrafts = async (options?: { silent?: boolean }) => {
+    const silent = Boolean(options?.silent);
+    if (!silent) {
+      setDraftsLoading(true);
+    }
     try {
       const response = await fetchAction<DraftsData>("draft_entries");
       setDrafts(response.data?.drafts ?? []);
     } catch {
       setDrafts([]);
     } finally {
-      setDraftsLoading(false);
+      if (!silent) {
+        setDraftsLoading(false);
+      }
     }
   };
 
-  const load = async () => {
-    setLoading(true);
-    setError(null);
+  const load = async (options?: { silent?: boolean }) => {
+    const silent = Boolean(options?.silent);
+    if (!silent) {
+      setLoading(true);
+      setError(null);
+    } else {
+      setSyncing(true);
+    }
 
     const [timesheetsResult, tasksResult, activityTypesResult] = await Promise.allSettled([
       fetchAction<TimesheetsData>("timesheets"),
@@ -220,6 +234,7 @@ export function TimesheetScreen() {
 
     if (timesheetsResult.status === "fulfilled") {
       setPayload(timesheetsResult.value.data);
+      setLastSyncedAt(new Date());
     } else {
       setPayload(null);
       setError(
@@ -241,13 +256,35 @@ export function TimesheetScreen() {
       setActivityTypes([]);
     }
 
-    setLoading(false);
+    if (!silent) {
+      setLoading(false);
+    } else {
+      setSyncing(false);
+    }
   };
 
   useEffect(() => {
     setNotificationPermission(getNotificationPermissionState());
     void load();
     void loadDrafts();
+  }, []);
+
+  useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState === "visible") {
+        void Promise.all([load({ silent: true }), loadDrafts({ silent: true })]);
+      }
+    };
+
+    const interval = window.setInterval(refresh, POLL_INTERVAL_MS);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
   }, []);
 
   useEffect(() => {
@@ -521,12 +558,22 @@ export function TimesheetScreen() {
               <div className="collapsible-header-copy">
                 <h2 className="panel-title">Timesheets</h2>
                 <p className="panel-subtitle">Manage your running timer and review time entries.</p>
+                <p className="panel-subtitle">
+                  {syncing
+                    ? "Syncing..."
+                    : lastSyncedAt
+                      ? `Last synced ${lastSyncedAt.toLocaleTimeString()}`
+                      : "Not synced yet"}
+                </p>
               </div>
               <div className="collapsible-header-meta">
                 <span className={`collapsible-chevron ${summaryOpen ? "is-open" : ""}`}>▼</span>
               </div>
             </button>
             <div className="button-row button-row-end">
+              <button className="timer-action-button" onClick={() => void Promise.all([load({ silent: true }), loadDrafts({ silent: true })])}>
+                Sync now
+              </button>
               {payload.runningTimer ? (
                 <button
                   className="timer-action-button timer-action-button-stop"

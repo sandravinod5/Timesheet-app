@@ -118,20 +118,11 @@ export function getLocalDateInputValue(date = new Date()) {
 }
 
 export function getElapsedSeconds(fromTime?: string | null, fromTimeUtc?: string | null) {
+  // Always trust backend UTC first. Local naive timestamps are display-only
+  // and can introduce 30/60/90 minute timezone drifts in cross-region usage.
   const startFromUtc = fromTimeUtc ? parseApiDateTime(undefined, fromTimeUtc) : null;
   const startFromLocal = fromTime ? parseApiDateTime(fromTime, undefined) : null;
-
-  // In multi-timezone deployments, backend-derived UTC can be offset when a
-  // naive local timestamp is converted with a single server timezone setting.
-  // If both exist and significantly disagree, trust the local timestamp for
-  // elapsed timer calculations.
-  let start = startFromUtc ?? startFromLocal;
-  if (startFromUtc && startFromLocal) {
-    const driftSeconds = Math.abs(startFromUtc.getTime() - startFromLocal.getTime()) / 1000;
-    if (driftSeconds >= 10 * 60) {
-      start = startFromLocal;
-    }
-  }
+  const start = startFromUtc ?? startFromLocal;
 
   if (!start) {
     return 0;

@@ -21,6 +21,7 @@ import { useToast } from "@/components/toast-provider";
 import { TimerModal } from "@/components/timer-modal";
 
 const STANDARD_HOURS_PER_DAY = 7;
+const POLL_INTERVAL_MS = 15 * 1000;
 
 function formatClockTime(value?: string | null, utcValue?: string | null) {
   return formatLocalTime(value, utcValue) || "-";
@@ -68,11 +69,18 @@ export function OverviewScreen() {
   const [recentTimesheetsOpen, setRecentTimesheetsOpen] = useState(false);
   const [recentVisitsOpen, setRecentVisitsOpen] = useState(false);
   const [elapsed, setElapsed] = useState(0);
+  const [syncing, setSyncing] = useState(false);
+  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
 
-  const load = async () => {
-    setLoading(true);
-    setError(null);
-    setRecentError(null);
+  const load = async (options?: { silent?: boolean }) => {
+    const silent = Boolean(options?.silent);
+    if (!silent) {
+      setLoading(true);
+      setError(null);
+      setRecentError(null);
+    } else {
+      setSyncing(true);
+    }
 
     const [overviewResult, tasksResult, timesheetsResult, activityTypesResult] = await Promise.allSettled([
       fetchAction<OverviewData>("overview"),
@@ -83,6 +91,7 @@ export function OverviewScreen() {
 
     if (overviewResult.status === "fulfilled") {
       setData(overviewResult.value.data);
+      setLastSyncedAt(new Date());
     } else {
       setData(null);
       setError(overviewResult.reason instanceof Error ? overviewResult.reason.message : "Overview could not be loaded.");
@@ -111,11 +120,38 @@ export function OverviewScreen() {
       setActivityTypes([]);
     }
 
-    setLoading(false);
+    if (!silent) {
+      setLoading(false);
+    } else {
+      setSyncing(false);
+    }
   };
 
   useEffect(() => {
     void load();
+  }, []);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void load({ silent: true });
+      }
+    }, POLL_INTERVAL_MS);
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void load({ silent: true });
+      }
+    };
+
+    window.addEventListener("focus", onVisibilityChange);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", onVisibilityChange);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   }, []);
 
   useEffect(() => {
@@ -292,7 +328,17 @@ export function OverviewScreen() {
             <div>
               <h2 className="panel-title">Overview</h2>
               <p className="panel-subtitle">Your live timer, monthly target, and task momentum.</p>
+              <p className="panel-subtitle">
+                {syncing
+                  ? "Syncing..."
+                  : lastSyncedAt
+                    ? `Last synced ${lastSyncedAt.toLocaleTimeString()}`
+                    : "Not synced yet"}
+              </p>
             </div>
+            <button className="timer-action-button" onClick={() => void load({ silent: true })}>
+              Sync now
+            </button>
           </div>
 
           <div className="hero-timer">
