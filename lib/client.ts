@@ -14,6 +14,7 @@ export async function fetchAction<T>(
 
   const response = await fetch(url.toString(), {
     method,
+    cache: "no-store",
     headers: method === "POST" ? { "Content-Type": "application/json" } : undefined,
     body: method === "POST" ? JSON.stringify({ action, ...(params || {}) }) : undefined
   });

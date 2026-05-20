@@ -1,33 +1,17 @@
-<<<<<<< HEAD
-const CACHE_NAME = "erpnext-timesheet-v4";
-const APP_SHELL = [
-  "/",
-  "/login",
-  "/manifest.webmanifest",
-  "/icon-192.png",
-  "/icon-512.png",
-  "/apple-touch-icon.png"
-];
+const CACHE_NAME = "erpnext-timesheet-v6";
+const APP_SHELL = ["/login", "/manifest.webmanifest", "/icon.svg", "/icon.png"];
 
 async function warmAppShell() {
   const cache = await caches.open(CACHE_NAME);
-
   await Promise.allSettled(
     APP_SHELL.map(async (path) => {
       const response = await fetch(path, { cache: "no-store" });
-
-      if (!response.ok) {
-        throw new Error(`Failed to cache ${path}: ${response.status}`);
+      if (response.ok) {
+        await cache.put(path, response.clone());
       }
-
-      await cache.put(path, response.clone());
     })
   );
 }
-=======
-const CACHE_NAME = "erpnext-timesheet-v6";
-const APP_SHELL = ["/login", "/manifest.webmanifest", "/icon.svg", "/icon.png"];
->>>>>>> 0ae4753 (Server-side direct updates)
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -61,6 +45,12 @@ self.addEventListener("fetch", (event) => {
 
   const isNavigation = event.request.mode === "navigate";
   const isNextStatic = url.pathname.startsWith("/_next/static/");
+  const isApiRequest = url.pathname.startsWith("/api/");
+
+  if (isApiRequest) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
 
   if (isNavigation) {
     event.respondWith(
@@ -80,7 +70,6 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (isNextStatic) {
-    // Prevent stale chunk references across deployments: prefer network for build assets.
     event.respondWith(
       fetch(event.request)
         .then((response) => {
