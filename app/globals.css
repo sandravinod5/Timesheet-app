@@ -1249,6 +1249,11 @@ textarea:focus-visible {
   min-height: 7.1rem;
 }
 
+.timer-parent-card .list-title {
+  color: var(--foreground);
+  line-height: 1.25;
+}
+
 .timer-parent-card-icon {
   width: 2rem;
   height: 2rem;
@@ -1311,6 +1316,10 @@ textarea:focus-visible {
 
 [data-theme="dark"] .timer-task-meta {
   color: rgba(203, 214, 235, 0.55);
+}
+
+[data-theme="dark"] .timer-parent-card .list-title {
+  color: #eef3ff;
 }
 
 [data-theme="dark"] .kpi-task-card {

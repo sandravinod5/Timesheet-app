@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Clock3, FileEdit, RefreshCw, Search, Square, X } from "lucide-react";
+import { Check, Clock3, FileEdit, Search, Square, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { fetchAction } from "@/lib/client";
 import { formatDateTimeLocalInput, formatLocalDateTime } from "@/lib/datetime";
@@ -576,14 +576,6 @@ export function TimesheetScreen() {
               </div>
             </button>
             <div className="button-row button-row-end">
-              <button
-                className="timer-action-button"
-                onClick={() => void Promise.all([load({ silent: true }), loadDrafts({ silent: true })])}
-                title="Sync now"
-                aria-label="Sync now"
-              >
-                <RefreshCw size={16} />
-              </button>
               {payload.runningTimer ? (
                 <button
                   className="timer-action-button timer-action-button-stop"
