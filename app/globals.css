@@ -1467,6 +1467,18 @@ textarea:focus-visible {
   color: var(--foreground);
 }
 
+.input-shell input[type="date"] {
+  color: var(--foreground);
+}
+
+[data-theme="light"] .input-shell input[type="date"]::-webkit-datetime-edit {
+  color: var(--foreground);
+}
+
+[data-theme="light"] .input-shell input[type="date"]::-webkit-calendar-picker-indicator {
+  opacity: 0.85;
+}
+
 [data-theme="dark"] .input-shell select,
 [data-theme="dark"] select,
 [data-theme="dark"] option {
