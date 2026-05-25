@@ -985,6 +985,10 @@ textarea:focus-visible {
   margin-bottom: 0.9rem;
 }
 
+.timesheet-toolbar-row {
+  flex-wrap: nowrap;
+}
+
 .meta-row-spaced {
   margin-top: 0.85rem;
 }

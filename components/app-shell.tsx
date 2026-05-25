@@ -33,14 +33,14 @@ type AppShellProps = React.PropsWithChildren<{
 export function AppShell({ children, user }: AppShellProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const [dark, setDark] = useState(true);
+  const [dark, setDark] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
   const displayName = user?.displayName?.trim() || "Signed In User";
 
   useEffect(() => {
     const stored = localStorage.getItem("theme");
-    const isDark = stored !== "light";
+    const isDark = stored === "dark";
     setDark(isDark);
     document.documentElement.setAttribute("data-theme", isDark ? "dark" : "light");
   }, []);

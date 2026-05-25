@@ -12,6 +12,10 @@ export function TasksScreen() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
+  const [customer, setCustomer] = useState("all");
+  const [project, setProject] = useState("all");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
 
   useEffect(() => {
     void (async () => {
@@ -32,6 +36,27 @@ export function TasksScreen() {
         return false;
       }
 
+      if (customer !== "all" && (task.customerId || "no-customer") !== customer) {
+        return false;
+      }
+
+      if (project !== "all" && (task.project || "no-project") !== project) {
+        return false;
+      }
+
+      const taskDate = task.expEndDate || task.createdOn;
+      if (fromDate && taskDate && taskDate < fromDate) {
+        return false;
+      }
+
+      if (toDate && taskDate && taskDate > toDate) {
+        return false;
+      }
+
+      if ((fromDate || toDate) && !taskDate) {
+        return false;
+      }
+
       if (!search.trim()) {
         return true;
       }
@@ -42,7 +67,7 @@ export function TasksScreen() {
         .toLowerCase()
         .includes(search.toLowerCase());
     });
-  }, [payload?.tasks, search, status]);
+  }, [payload?.tasks, search, status, customer, project, fromDate, toDate]);
 
   if (loading) {
     return <LoadingState label="Loading tasks..." />;
@@ -102,6 +127,42 @@ export function TasksScreen() {
                 </option>
               ))}
             </select>
+          </InputShell>
+
+          <InputShell className="filter-select-shell">
+            <select value={customer} onChange={(event) => setCustomer(event.target.value)}>
+              <option value="all">All customers</option>
+              {[...new Map(
+                payload.tasks
+                  .map((task) => [task.customerId || "no-customer", task.customerName || "No customer"] as const)
+              ).entries()].map(([id, name]) => (
+                <option key={id} value={id}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </InputShell>
+
+          <InputShell className="filter-select-shell">
+            <select value={project} onChange={(event) => setProject(event.target.value)}>
+              <option value="all">All projects</option>
+              {[...new Map(
+                payload.tasks
+                  .map((task) => [task.project || "no-project", task.projectName || "No project"] as const)
+              ).entries()].map(([id, name]) => (
+                <option key={id} value={id}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </InputShell>
+
+          <InputShell className="filter-select-shell">
+            <input type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} aria-label="From date" />
+          </InputShell>
+
+          <InputShell className="filter-select-shell">
+            <input type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} aria-label="To date" />
           </InputShell>
         </div>
 

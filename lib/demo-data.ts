@@ -608,6 +608,73 @@ function stopTimer() {
   };
 }
 
+function createManualTimesheet(params: Record<string, string>) {
+  const task = tasksSeed.find((item) => item.taskId === params.task);
+  if (!task) {
+    return {
+      success: false,
+      action: "create_manual_timesheet",
+      data: null,
+      error: "Task not found"
+    };
+  }
+
+  if (!params.from_time || !params.to_time) {
+    return {
+      success: false,
+      action: "create_manual_timesheet",
+      data: null,
+      error: "from_time and to_time are required"
+    };
+  }
+
+  const from = new Date(params.from_time.replace(" ", "T"));
+  const to = new Date(params.to_time.replace(" ", "T"));
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || to <= from) {
+    return {
+      success: false,
+      action: "create_manual_timesheet",
+      data: null,
+      error: "Invalid time range"
+    };
+  }
+
+  const hours = Number(((to.getTime() - from.getTime()) / 3600000).toFixed(2));
+  const idSuffix = Date.now().toString();
+  demoTimesheets = [
+    {
+      timesheetDetailId: `TSD-MAN-${idSuffix}`,
+      timesheetId: `TS-MAN-${idSuffix}`,
+      task: task.taskId,
+      taskSubject: task.subject,
+      owner: "employee@erpnext.local",
+      userId: "employee@erpnext.local",
+      employee: "EMP-0001",
+      employeeName: "Demo Employee",
+      customerId: task.customerId || undefined,
+      customerName: task.customerName || undefined,
+      project: task.project || undefined,
+      projectName: task.projectName || undefined,
+      activityType: params.activity_type || "Working",
+      notes: params.notes || "",
+      fromTime: params.from_time,
+      toTime: params.to_time,
+      hours,
+      isRunning: false
+    },
+    ...demoTimesheets
+  ];
+
+  return {
+    success: true,
+    action: "create_manual_timesheet",
+    data: {
+      message: "Manual timesheet entry created"
+    },
+    error: null
+  };
+}
+
 export function handleDemoAction(action: string, params: Record<string, string>) {
   if (action === "overview") {
     return {
@@ -668,6 +735,10 @@ export function handleDemoAction(action: string, params: Record<string, string>)
 
   if (action === "stop_timer") {
     return stopTimer();
+  }
+
+  if (action === "create_manual_timesheet") {
+    return createManualTimesheet(params);
   }
 
   return {

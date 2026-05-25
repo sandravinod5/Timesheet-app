@@ -7,11 +7,12 @@ import { formatDateTimeLocalInput, formatLocalDateTime } from "@/lib/datetime";
 import { requestNotificationPermission, shouldSendNotification, showSystemNotification, getNotificationPermissionState } from "@/lib/notifications";
 import type { ActivityTypeOption, ActivityTypesData, DraftEntry, DraftsData, Task, TimesheetsData } from "@/lib/types";
 import { formatHours, formatWorkedTime } from "@/lib/utils";
-import { Button, EmptyState, InputShell, LoadingState, Panel } from "@/components/ui";
+import { Button, EmptyState, InputShell, LoadingState, Modal, Panel } from "@/components/ui";
 import { useToast } from "@/components/toast-provider";
 import { TimerModal } from "@/components/timer-modal";
 
 const POLL_INTERVAL_MS = 15 * 1000;
+const NOTIFICATIONS_MUTED_KEY = "timesheet_notifications_muted";
 
 function toDateTimeLocal(value: string | null | undefined, utcValue?: string | null) {
   return formatDateTimeLocalInput(value, utcValue);
@@ -197,6 +198,16 @@ export function TimesheetScreen() {
   const [summaryOpen, setSummaryOpen] = useState(true);
   const [timesheetsOpen, setTimesheetsOpen] = useState(true);
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | "unsupported">("unsupported");
+  const [notificationsMuted, setNotificationsMuted] = useState(false);
+  const [showManualEntryModal, setShowManualEntryModal] = useState(false);
+  const [manualTaskId, setManualTaskId] = useState("");
+  const [manualTaskSearch, setManualTaskSearch] = useState("");
+  const [manualParentGroup, setManualParentGroup] = useState("");
+  const [manualActivityType, setManualActivityType] = useState("");
+  const [manualFrom, setManualFrom] = useState("");
+  const [manualTo, setManualTo] = useState("");
+  const [manualNotes, setManualNotes] = useState("");
+  const [manualSaving, setManualSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
 
@@ -270,6 +281,8 @@ export function TimesheetScreen() {
 
   useEffect(() => {
     setNotificationPermission(getNotificationPermissionState());
+    const storedMuted = localStorage.getItem(NOTIFICATIONS_MUTED_KEY);
+    setNotificationsMuted(storedMuted === "true");
     void load();
     void loadDrafts();
   }, []);
@@ -294,7 +307,7 @@ export function TimesheetScreen() {
 
   useEffect(() => {
     const maybeNotify = async () => {
-      if (notificationPermission !== "granted" || document.visibilityState !== "hidden") {
+      if (notificationPermission !== "granted" || notificationsMuted || document.visibilityState !== "hidden") {
         return;
       }
 
@@ -337,7 +350,7 @@ export function TimesheetScreen() {
       window.clearInterval(intervalId);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [drafts.length, notificationPermission, payload?.runningTimer]);
+  }, [drafts.length, notificationPermission, notificationsMuted, payload?.runningTimer]);
 
   const lastWorkedId = useMemo(() => {
     const entry = payload?.timesheets?.find((e) => !e.isRunning);
@@ -357,6 +370,108 @@ export function TimesheetScreen() {
         .includes(search.toLowerCase())
     );
   }, [payload?.timesheets, search]);
+
+  const openManualEntryModal = () => {
+    if (tasks.length === 0) {
+      showToast({
+        title: "No tasks available",
+        message: "Load tasks first, then add a manual entry.",
+        variant: "error"
+      });
+      return;
+    }
+
+    const now = new Date();
+    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+    const availableActivityTypes =
+      activityTypes.length > 0 ? activityTypes : [{ name: "Working", customParentGroup: "Internal (Others)" }];
+    const parentConfig = ["Visit", "Internal (Others)", "Review", "Finalisation", "Drafting"];
+    const definedParents = [...new Set(
+      availableActivityTypes
+        .map((item) => (item.customParentGroup || "").trim())
+        .filter(Boolean)
+    )];
+    const orderedParents = [
+      ...parentConfig.filter((name) => definedParents.includes(name)),
+      ...definedParents.filter((name) => !parentConfig.includes(name))
+    ];
+    const firstParent = orderedParents[0] || "Internal (Others)";
+    const firstActivity =
+      availableActivityTypes.find(
+        (item) => (item.customParentGroup || "Internal (Others)").trim().toLowerCase() === firstParent.toLowerCase()
+      )?.name || availableActivityTypes[0]?.name || "Working";
+
+    setManualTaskId(tasks[0]?.taskId || "");
+    setManualTaskSearch("");
+    setManualParentGroup(firstParent);
+    setManualActivityType(firstActivity);
+    setManualFrom(formatDateTimeLocalInput(oneHourAgo.toISOString()));
+    setManualTo(formatDateTimeLocalInput(now.toISOString()));
+    setManualNotes("");
+    setShowManualEntryModal(true);
+  };
+
+  const closeManualEntryModal = () => {
+    if (manualSaving) {
+      return;
+    }
+    setShowManualEntryModal(false);
+  };
+
+  const manualParentGroups = useMemo(() => {
+    const availableActivityTypes =
+      activityTypes.length > 0 ? activityTypes : [{ name: "Working", customParentGroup: "Internal (Others)" }];
+    const parentConfig = ["Visit", "Internal (Others)", "Review", "Finalisation", "Drafting"];
+    const defined = [...new Set(
+      availableActivityTypes
+        .map((item) => (item.customParentGroup || "").trim())
+        .filter(Boolean)
+    )];
+    return [
+      ...parentConfig.filter((name) => defined.includes(name)),
+      ...defined.filter((name) => !parentConfig.includes(name))
+    ];
+  }, [activityTypes]);
+
+  const manualActivitiesForParent = useMemo(() => {
+    const availableActivityTypes =
+      activityTypes.length > 0 ? activityTypes : [{ name: "Working", customParentGroup: "Internal (Others)" }];
+    const parent = (manualParentGroup || "").trim().toLowerCase();
+    return availableActivityTypes
+      .filter((item) => (item.customParentGroup || "Internal (Others)").trim().toLowerCase() === parent)
+      .map((item) => item.name);
+  }, [activityTypes, manualParentGroup]);
+
+  const filteredManualTasks = useMemo(() => {
+    const query = manualTaskSearch.trim().toLowerCase();
+    if (!query) {
+      return tasks;
+    }
+
+    return tasks.filter((task) =>
+      [task.subject, task.taskId, task.customerName, task.projectName]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(query)
+    );
+  }, [manualTaskSearch, tasks]);
+
+  useEffect(() => {
+    if (!showManualEntryModal) {
+      return;
+    }
+
+    if (filteredManualTasks.length === 0) {
+      setManualTaskId("");
+      return;
+    }
+
+    const exists = filteredManualTasks.some((task) => task.taskId === manualTaskId);
+    if (!exists) {
+      setManualTaskId(filteredManualTasks[0].taskId);
+    }
+  }, [filteredManualTasks, manualTaskId, showManualEntryModal]);
 
   const startTimer = async (task: Task, activityType: string, notes: string) => {
     const taskId = task?.taskId?.trim();
@@ -424,6 +539,75 @@ export function TimesheetScreen() {
     } finally {
       setStopping(false);
       await Promise.all([load(), loadDrafts()]);
+    }
+  };
+
+  const createManualEntry = async () => {
+    if (!manualTaskId) {
+      showToast({
+        title: "Task required",
+        message: "Please select a task for this manual entry.",
+        variant: "error"
+      });
+      return;
+    }
+
+    if (!manualActivityType.trim()) {
+      showToast({
+        title: "Activity required",
+        message: "Please select an activity type.",
+        variant: "error"
+      });
+      return;
+    }
+
+    if (!manualFrom || !manualTo) {
+      showToast({
+        title: "Time range required",
+        message: "Please provide both start and end time.",
+        variant: "error"
+      });
+      return;
+    }
+
+    const fromValue = fromDateTimeLocal(manualFrom);
+    const toValue = fromDateTimeLocal(manualTo);
+    if (fromValue >= toValue) {
+      showToast({
+        title: "Invalid time range",
+        message: "End time must be after start time.",
+        variant: "error"
+      });
+      return;
+    }
+
+    setManualSaving(true);
+    try {
+      await fetchAction(
+        "create_manual_timesheet",
+        {
+          task: manualTaskId,
+          activity_type: manualActivityType.trim(),
+          from_time: fromValue,
+          to_time: toValue,
+          notes: manualNotes.trim()
+        },
+        "POST"
+      );
+      setShowManualEntryModal(false);
+      showToast({
+        title: "Manual entry added",
+        message: "The timesheet entry was saved to draft entries."
+      });
+      await Promise.all([load(), loadDrafts()]);
+    } catch (err) {
+      showToast({
+        title: "Unable to add manual entry",
+        message: err instanceof Error ? err.message : "Please try again.",
+        variant: "error"
+      });
+    } finally {
+      setManualSaving(false);
     }
   };
 
@@ -508,11 +692,26 @@ export function TimesheetScreen() {
     }
   };
 
-  const enableNotifications = async () => {
+  const toggleNotifications = async () => {
+    if (notificationPermission === "granted") {
+      const nextMuted = !notificationsMuted;
+      setNotificationsMuted(nextMuted);
+      localStorage.setItem(NOTIFICATIONS_MUTED_KEY, nextMuted ? "true" : "false");
+      showToast({
+        title: nextMuted ? "Notifications disabled" : "Notifications enabled",
+        message: nextMuted
+          ? "Timesheet reminders are turned off for this browser."
+          : "Timesheet reminders are now active again."
+      });
+      return;
+    }
+
     const permission = await requestNotificationPermission();
     setNotificationPermission(permission);
 
     if (permission === "granted") {
+      setNotificationsMuted(false);
+      localStorage.setItem(NOTIFICATIONS_MUTED_KEY, "false");
       showToast({
         title: "Notifications enabled",
         message: "You will receive timer and draft reminders when supported."
@@ -596,15 +795,22 @@ export function TimesheetScreen() {
 
           {summaryOpen ? (
             <div className="collapsible-body">
-              <div className="button-row toolbar-row">
+              <div className="button-row toolbar-row timesheet-toolbar-row">
                 <Button
                   type="button"
-                  variant={notificationPermission === "granted" ? "secondary" : "primary"}
-                  onClick={() => void enableNotifications()}
-                  disabled={notificationPermission === "granted"}
+                  variant={notificationPermission === "granted" && !notificationsMuted ? "secondary" : "primary"}
+                  onClick={() => void toggleNotifications()}
                 >
-                  {notificationPermission === "granted" ? "Notifications Enabled" : "Enable Mobile Notifications"}
+                  {notificationPermission === "granted"
+                    ? notificationsMuted
+                      ? "Enable Notifications"
+                      : "Disable Notifications"
+                    : "Enable Mobile Notifications"}
                 </Button>
+                <button type="button" className="timer-action-button timer-action-button-start" onClick={openManualEntryModal}>
+                  <Clock3 size={16} />
+                  Add Manual Entry
+                </button>
               </div>
               <div className="metric-grid metric-grid--timesheet">
                 <article className="metric-card">
@@ -757,6 +963,104 @@ export function TimesheetScreen() {
         onClose={() => setShowTimerModal(false)}
         onStart={startTimer}
       />
+      {showManualEntryModal ? (
+        <Modal title="Add Manual Timesheet Entry" subtitle="Log missed work without starting a timer" onClose={closeManualEntryModal}>
+          <div className="draft-edit-form">
+            <div className="draft-edit-row draft-edit-row--full">
+              <label className="report-date-label">Task</label>
+              <label className="input-shell modal-search" style={{ marginBottom: "0.55rem" }}>
+                <Search size={18} color="var(--muted)" />
+                <input
+                  value={manualTaskSearch}
+                  onChange={(e) => setManualTaskSearch(e.target.value)}
+                  placeholder="Search task, customer, or project"
+                />
+              </label>
+              <label className="input-shell">
+                <select value={manualTaskId} onChange={(e) => setManualTaskId(e.target.value)}>
+                  {filteredManualTasks.map((task) => (
+                    <option key={task.taskId} value={task.taskId}>
+                      {task.subject}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {filteredManualTasks.length === 0 ? (
+                <p className="panel-subtitle">No tasks match your search.</p>
+              ) : null}
+            </div>
+            <div className="draft-edit-row draft-edit-row--full">
+              <label className="report-date-label">Parent Group</label>
+              <label className="input-shell">
+                <select
+                  value={manualParentGroup}
+                  onChange={(e) => {
+                    const nextParent = e.target.value;
+                    setManualParentGroup(nextParent);
+                    const availableActivityTypes =
+                      activityTypes.length > 0 ? activityTypes : [{ name: "Working", customParentGroup: "Internal (Others)" }];
+                    const nextActivity =
+                      availableActivityTypes.find(
+                        (item) => (item.customParentGroup || "Internal (Others)").trim().toLowerCase() === nextParent.toLowerCase()
+                      )?.name || "";
+                    setManualActivityType(nextActivity);
+                  }}
+                >
+                  {manualParentGroups.map((group) => (
+                    <option key={group} value={group}>
+                      {group}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="draft-edit-row draft-edit-row--full">
+              <label className="report-date-label">Activity Type</label>
+              <label className="input-shell">
+                <select value={manualActivityType} onChange={(e) => setManualActivityType(e.target.value)}>
+                  {manualActivitiesForParent.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                  {manualActivitiesForParent.length === 0 ? <option value="Working">Working</option> : null}
+                </select>
+              </label>
+            </div>
+            <div className="draft-edit-row">
+              <label className="report-date-label">From</label>
+              <input type="datetime-local" className="report-date-input" value={manualFrom} onChange={(e) => setManualFrom(e.target.value)} />
+            </div>
+            <div className="draft-edit-row">
+              <label className="report-date-label">To</label>
+              <input type="datetime-local" className="report-date-input" value={manualTo} onChange={(e) => setManualTo(e.target.value)} />
+            </div>
+            <div className="draft-edit-row draft-edit-row--full">
+              <label className="report-date-label">Description (optional)</label>
+              <textarea
+                className="draft-edit-textarea"
+                value={manualNotes}
+                onChange={(e) => setManualNotes(e.target.value)}
+                placeholder="What work was done?"
+                rows={3}
+              />
+            </div>
+            <div className="button-row button-row-end">
+              <button type="button" className="timer-action-button" onClick={closeManualEntryModal} disabled={manualSaving}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="timer-action-button timer-action-button-start"
+                onClick={() => void createManualEntry()}
+                disabled={manualSaving}
+              >
+                {manualSaving ? "Saving..." : "Save Entry"}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      ) : null}
     </>
   );
 }

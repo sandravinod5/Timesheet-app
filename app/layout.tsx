@@ -19,7 +19,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#151b2e",
+  themeColor: "#e0e5ec",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover"
@@ -31,7 +31,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" data-theme="dark">
+    <html lang="en" data-theme="light">
       <body>
         <ToastProvider>
           <PwaRegister />
