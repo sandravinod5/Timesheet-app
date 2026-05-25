@@ -157,13 +157,27 @@ export function TasksScreen() {
             </select>
           </InputShell>
 
-          <InputShell className="filter-select-shell">
-            <input type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} aria-label="From date" />
-          </InputShell>
+          <div className="report-date-field filter-select-shell">
+            <label className="report-date-label">From date</label>
+            <input
+              type="date"
+              className="report-date-input"
+              value={fromDate}
+              onChange={(event) => setFromDate(event.target.value)}
+              aria-label="From date"
+            />
+          </div>
 
-          <InputShell className="filter-select-shell">
-            <input type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} aria-label="To date" />
-          </InputShell>
+          <div className="report-date-field filter-select-shell">
+            <label className="report-date-label">To date</label>
+            <input
+              type="date"
+              className="report-date-input"
+              value={toDate}
+              onChange={(event) => setToDate(event.target.value)}
+              aria-label="To date"
+            />
+          </div>
         </div>
 
         {filteredTasks.length === 0 ? (
