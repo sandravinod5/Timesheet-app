@@ -571,8 +571,6 @@ export function VisitsScreen() {
     return stats;
   }, [taskData]);
 
-  const currentCalendarData = calendarMode === "visit" ? visitData : taskData;
-
   const flipToMode = (targetMode: "visit" | "task") => {
     if (targetMode === calendarMode) {
       return;
@@ -735,7 +733,7 @@ export function VisitsScreen() {
               return <div key={day.key} className="visit-day visit-day--empty" />;
             }
 
-            const items = currentCalendarData[day.key] || [];
+            const items = visitData[day.key] || [];
             const dayTasks = taskData[day.key] || [];
             const scheduledCount = items.filter((item) => item.kind === "scheduled").length;
             const completedCount = items.filter((item) => item.kind === "completed").length;
@@ -758,7 +756,7 @@ export function VisitsScreen() {
                   "visit-day",
                   isSelected ? "is-selected" : "",
                   isToday ? "is-today" : "",
-                  items.length > 0 ? "has-visits" : ""
+                  (calendarMode === "visit" ? items.length > 0 : dayTasks.length > 0) ? "has-visits" : ""
                 ].filter(Boolean).join(" ")}
                 style={{ animationDelay: `${index * 18}ms` }}
                 onClick={() => {
