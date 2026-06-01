@@ -14,8 +14,6 @@ export function TasksScreen() {
   const [status, setStatus] = useState("all");
   const [customer, setCustomer] = useState("all");
   const [project, setProject] = useState("all");
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
 
   useEffect(() => {
     void (async () => {
@@ -44,19 +42,6 @@ export function TasksScreen() {
         return false;
       }
 
-      const taskDate = task.expEndDate || task.createdOn;
-      if (fromDate && taskDate && taskDate < fromDate) {
-        return false;
-      }
-
-      if (toDate && taskDate && taskDate > toDate) {
-        return false;
-      }
-
-      if ((fromDate || toDate) && !taskDate) {
-        return false;
-      }
-
       if (!search.trim()) {
         return true;
       }
@@ -67,7 +52,7 @@ export function TasksScreen() {
         .toLowerCase()
         .includes(search.toLowerCase());
     });
-  }, [payload?.tasks, search, status, customer, project, fromDate, toDate]);
+  }, [payload?.tasks, search, status, customer, project]);
 
   if (loading) {
     return <LoadingState label="Loading tasks..." />;
@@ -157,27 +142,6 @@ export function TasksScreen() {
             </select>
           </InputShell>
 
-          <div className="report-date-field filter-select-shell">
-            <label className="report-date-label">From date</label>
-            <input
-              type="date"
-              className="report-date-input"
-              value={fromDate}
-              onChange={(event) => setFromDate(event.target.value)}
-              aria-label="From date"
-            />
-          </div>
-
-          <div className="report-date-field filter-select-shell">
-            <label className="report-date-label">To date</label>
-            <input
-              type="date"
-              className="report-date-input"
-              value={toDate}
-              onChange={(event) => setToDate(event.target.value)}
-              aria-label="To date"
-            />
-          </div>
         </div>
 
         {filteredTasks.length === 0 ? (

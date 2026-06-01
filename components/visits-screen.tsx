@@ -60,6 +60,14 @@ function extractDate(value?: string | null) {
   return getDateKeyFromDateTime(value);
 }
 
+function getTaskCalendarDate(task: Task) {
+  const candidate = extractDate((task as Task & { expStartDate?: string | null; expectedStartDate?: string | null }).expStartDate) ||
+    extractDate((task as Task & { expStartDate?: string | null; expectedStartDate?: string | null }).expectedStartDate) ||
+    extractDate(task.expEndDate) ||
+    extractDate(task.createdOn);
+  return candidate;
+}
+
 function compactVisitLabel(item: VisitItem) {
   const source = item.customerName || item.subject || "Visit";
   const normalized = source.replace(/\s+/g, " ").trim();
@@ -278,9 +286,12 @@ function VisitDetailsModal({
 }
 
 export function VisitsScreen() {
+  const [calendarMode, setCalendarMode] = useState<"visit" | "task">("visit");
   const [monthCursor, setMonthCursor] = useState(firstOfMonth(new Date()));
   const [selectedDate, setSelectedDate] = useState(dateKey(new Date()));
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [calendarFlipClass, setCalendarFlipClass] = useState("");
   const [tasks, setTasks] = useState<Task[]>([]);
   const [timesheetData, setTimesheetData] = useState<TimesheetsData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -418,7 +429,7 @@ export function VisitsScreen() {
     });
 
     for (const task of visitTaskMap.values()) {
-      const scheduledDate = extractDate(task.expEndDate);
+      const scheduledDate = getTaskCalendarDate(task);
       if (!scheduledDate || !scheduledDate.startsWith(selectedMonthKey)) {
         continue;
       }
@@ -498,6 +509,28 @@ export function VisitsScreen() {
   }, [monthCursor, selectedDate, visitData]);
 
   const selectedItems = visitData[selectedDate] || [];
+  const taskData = useMemo(() => {
+    const byDate: Record<string, Task[]> = {};
+    const monthPrefix = `${monthCursor.getFullYear()}-${pad(monthCursor.getMonth() + 1)}`;
+    tasks.forEach((task) => {
+      const key = getTaskCalendarDate(task);
+      if (!key || !key.startsWith(monthPrefix)) {
+        return;
+      }
+      if (!byDate[key]) {
+        byDate[key] = [];
+      }
+      byDate[key].push(task);
+    });
+
+    Object.values(byDate).forEach((rows) => {
+      rows.sort((a, b) => a.subject.localeCompare(b.subject));
+    });
+
+    return byDate;
+  }, [monthCursor, tasks]);
+
+  const selectedTasks = taskData[selectedDate] || [];
   const monthlyScheduledItems = useMemo(
     () =>
       Object.values(visitData)
@@ -512,6 +545,33 @@ export function VisitsScreen() {
         }),
     [visitData]
   );
+
+  const taskStats = useMemo(() => {
+    const stats = {
+      pending: 0,
+      inProgress: 0,
+      completed: 0,
+      overdue: 0
+    };
+
+    Object.values(taskData).forEach((rows) => {
+      rows.forEach((task) => {
+        if (["Completed", "Closed"].includes(task.status)) {
+          stats.completed += 1;
+        } else if (task.isOverdue) {
+          stats.overdue += 1;
+        } else if (["Working", "In Progress", "Under Execution", "Under Review", "In Progress With BO", "Revising Report BO"].includes(task.status)) {
+          stats.inProgress += 1;
+        } else {
+          stats.pending += 1;
+        }
+      });
+    });
+
+    return stats;
+  }, [taskData]);
+
+  const currentCalendarData = calendarMode === "visit" ? visitData : taskData;
 
   if (loading && !timesheetData && tasks.length === 0) {
     return <LoadingState label="Loading visits..." />;
@@ -528,32 +588,97 @@ export function VisitsScreen() {
           <div>
             <div className="visit-hero-kicker">
               <Sparkles size={14} />
-              <span>Visit planner</span>
+              <span>{calendarMode === "visit" ? "Visit planner" : "Task planner"}</span>
             </div>
-            <h2 className="panel-title visit-hero-title">Client Visits Calendar</h2>
+            <h2 className="panel-title visit-hero-title">{calendarMode === "visit" ? "Visit Calendar" : "Task Calendar"}</h2>
             <p className="panel-subtitle visit-hero-copy">
-              Track scheduled visits, completed visits, and live visit timers by date.
+              {calendarMode === "visit"
+                ? "Track scheduled visits, completed visits, and live visit timers by date."
+                : "Track tasks by expected start date. Tap a day to view task status list."}
             </p>
           </div>
         </div>
 
         <div className="visit-hero-stats">
-          <article className="visit-stat-card visit-stat-card--scheduled">
-            <span className="visit-stat-label">Scheduled</span>
-            <span className="visit-stat-value">{monthStats.scheduled}</span>
-          </article>
-          <article className="visit-stat-card visit-stat-card--completed">
-            <span className="visit-stat-label">Visited</span>
-            <span className="visit-stat-value">{monthStats.completed}</span>
-          </article>
-          <article className="visit-stat-card visit-stat-card--running">
-            <span className="visit-stat-label">Running</span>
-            <span className="visit-stat-value">{monthStats.running}</span>
-          </article>
+          {calendarMode === "visit" ? (
+            <>
+              <article className="visit-stat-card visit-stat-card--scheduled">
+                <span className="visit-stat-label">Scheduled</span>
+                <span className="visit-stat-value">{monthStats.scheduled}</span>
+              </article>
+              <article className="visit-stat-card visit-stat-card--completed">
+                <span className="visit-stat-label">Visited</span>
+                <span className="visit-stat-value">{monthStats.completed}</span>
+              </article>
+              <article className="visit-stat-card visit-stat-card--running">
+                <span className="visit-stat-label">Running</span>
+                <span className="visit-stat-value">{monthStats.running}</span>
+              </article>
+            </>
+          ) : (
+            <>
+              <article className="visit-stat-card visit-stat-card--scheduled">
+                <span className="visit-stat-label">Pending</span>
+                <span className="visit-stat-value">{taskStats.pending}</span>
+              </article>
+              <article className="visit-stat-card visit-stat-card--completed">
+                <span className="visit-stat-label">In Progress</span>
+                <span className="visit-stat-value">{taskStats.inProgress}</span>
+              </article>
+              <article className="visit-stat-card visit-stat-card--running">
+                <span className="visit-stat-label">Completed</span>
+                <span className="visit-stat-value">{taskStats.completed}</span>
+              </article>
+            </>
+          )}
         </div>
       </Panel>
 
-      <Panel className="visit-calendar-panel visits-calendar-main">
+      <Panel
+        className={`visit-calendar-panel visits-calendar-main ${calendarFlipClass}`.trim()}
+        onTouchStart={(event) => setTouchStartX(event.changedTouches[0]?.clientX ?? null)}
+        onTouchEnd={(event) => {
+          const endX = event.changedTouches[0]?.clientX;
+          if (touchStartX == null || typeof endX !== "number") {
+            setTouchStartX(null);
+            return;
+          }
+          const delta = endX - touchStartX;
+          if (Math.abs(delta) < 42) {
+            setTouchStartX(null);
+            return;
+          }
+          const targetMode: "visit" | "task" = delta < 0 ? "task" : "visit";
+          if (targetMode === calendarMode) {
+            setTouchStartX(null);
+            return;
+          }
+
+          setCalendarFlipClass(delta < 0 ? "is-flipping-left" : "is-flipping-right");
+          window.setTimeout(() => {
+            setCalendarMode(targetMode);
+            setCalendarFlipClass("is-flip-enter");
+            window.setTimeout(() => setCalendarFlipClass(""), 220);
+          }, 140);
+          setTouchStartX(null);
+        }}
+      >
+        <div className="calendar-mode-switch">
+          <button
+            type="button"
+            className={calendarMode === "visit" ? "calendar-mode-btn is-active" : "calendar-mode-btn"}
+            onClick={() => setCalendarMode("visit")}
+          >
+            Visit Calendar
+          </button>
+          <button
+            type="button"
+            className={calendarMode === "task" ? "calendar-mode-btn is-active" : "calendar-mode-btn"}
+            onClick={() => setCalendarMode("task")}
+          >
+            Task Calendar
+          </button>
+        </div>
         <div className="visit-calendar-toolbar">
           <button
             type="button"
@@ -565,7 +690,11 @@ export function VisitsScreen() {
           </button>
           <div className="visit-calendar-month">
             <h3 className="visit-calendar-title">{formatMonthLabel(monthCursor)}</h3>
-            <p className="panel-subtitle">Tap a day to see gone visits and scheduled visits.</p>
+            <p className="panel-subtitle">
+              {calendarMode === "visit"
+                ? "Tap a day to see completed and scheduled visits."
+                : "Tap a day to see tasks planned for that date and status."}
+            </p>
           </div>
           <button
             type="button"
@@ -578,9 +707,19 @@ export function VisitsScreen() {
         </div>
 
         <div className="visit-calendar-legend">
-          <span><i className="visit-dot visit-dot--scheduled" /> Scheduled</span>
-          <span><i className="visit-dot visit-dot--completed" /> Visited</span>
-          <span><i className="visit-dot visit-dot--running" /> Running</span>
+          {calendarMode === "visit" ? (
+            <>
+              <span><i className="visit-dot visit-dot--scheduled" /> Scheduled</span>
+              <span><i className="visit-dot visit-dot--completed" /> Visited</span>
+              <span><i className="visit-dot visit-dot--running" /> Running</span>
+            </>
+          ) : (
+            <>
+              <span><i className="visit-dot visit-dot--scheduled" /> Pending</span>
+              <span><i className="visit-dot visit-dot--completed" /> In Progress</span>
+              <span><i className="visit-dot visit-dot--running" /> Completed</span>
+            </>
+          )}
         </div>
 
         <div className="visit-calendar-grid">
@@ -595,14 +734,20 @@ export function VisitsScreen() {
               return <div key={day.key} className="visit-day visit-day--empty" />;
             }
 
-            const items = visitData[day.key] || [];
+            const items = currentCalendarData[day.key] || [];
+            const dayTasks = taskData[day.key] || [];
             const scheduledCount = items.filter((item) => item.kind === "scheduled").length;
             const completedCount = items.filter((item) => item.kind === "completed").length;
             const runningCount = items.filter((item) => item.kind === "running").length;
-            const labels = Array.from(new Set(items.map((item) => compactVisitLabel(item)).filter(Boolean))).slice(0, 1);
-            const extraCount = Math.max(0, items.length - 1);
+            const labels = calendarMode === "visit"
+              ? Array.from(new Set(items.map((item) => compactVisitLabel(item)).filter(Boolean))).slice(0, 1)
+              : Array.from(new Set(dayTasks.map((task) => (task.customerName || task.subject || "Task")))).slice(0, 1);
+            const extraCount = Math.max(0, items.length - 1, dayTasks.length - 1);
             const isSelected = selectedDate === day.key;
             const isToday = day.key === dateKey(new Date());
+            const dayPending = dayTasks.filter((task) => !["Completed", "Closed"].includes(task.status) && !task.isOverdue && !["Working", "In Progress", "Under Execution", "Under Review", "In Progress With BO", "Revising Report BO"].includes(task.status)).length;
+            const dayInProgress = dayTasks.filter((task) => ["Working", "In Progress", "Under Execution", "Under Review", "In Progress With BO", "Revising Report BO"].includes(task.status)).length;
+            const dayCompleted = dayTasks.filter((task) => ["Completed", "Closed"].includes(task.status)).length;
 
             return (
               <button
@@ -632,9 +777,19 @@ export function VisitsScreen() {
                   ) : null}
                 </div>
                 <div className="visit-day-indicators">
-                  {scheduledCount > 0 ? <span className="visit-day-pill visit-day-pill--scheduled">{scheduledCount}</span> : null}
-                  {completedCount > 0 ? <span className="visit-day-pill visit-day-pill--completed">{completedCount}</span> : null}
-                  {runningCount > 0 ? <span className="visit-day-pill visit-day-pill--running">{runningCount}</span> : null}
+                  {calendarMode === "visit" ? (
+                    <>
+                      {scheduledCount > 0 ? <span className="visit-day-pill visit-day-pill--scheduled">{scheduledCount}</span> : null}
+                      {completedCount > 0 ? <span className="visit-day-pill visit-day-pill--completed">{completedCount}</span> : null}
+                      {runningCount > 0 ? <span className="visit-day-pill visit-day-pill--running">{runningCount}</span> : null}
+                    </>
+                  ) : (
+                    <>
+                      {dayPending > 0 ? <span className="visit-day-pill visit-day-pill--scheduled">{dayPending}</span> : null}
+                      {dayInProgress > 0 ? <span className="visit-day-pill visit-day-pill--completed">{dayInProgress}</span> : null}
+                      {dayCompleted > 0 ? <span className="visit-day-pill visit-day-pill--running">{dayCompleted}</span> : null}
+                    </>
+                  )}
                 </div>
               </button>
             );
@@ -645,43 +800,98 @@ export function VisitsScreen() {
       <Panel className="visit-month-schedule-panel visits-schedule-side">
         <div className="visit-month-schedule-head">
           <div>
-            <h3 className="panel-title">Scheduled Visits This Month</h3>
+            <h3 className="panel-title">{calendarMode === "visit" ? "Scheduled Visits This Month" : "Tasks This Month"}</h3>
           </div>
-          <span className="visit-summary-chip visit-summary-chip--scheduled">{monthlyScheduledItems.length} scheduled</span>
+          <span className="visit-summary-chip visit-summary-chip--scheduled">
+            {calendarMode === "visit" ? `${monthlyScheduledItems.length} scheduled` : `${Object.values(taskData).flat().length} tasks`}
+          </span>
         </div>
 
-        {monthlyScheduledItems.length === 0 ? (
+        {calendarMode === "visit" && monthlyScheduledItems.length === 0 ? (
           <EmptyState title="No scheduled visits this month" copy="Any remaining scheduled visit tasks for this month will appear here." />
+        ) : calendarMode === "task" && Object.values(taskData).flat().length === 0 ? (
+          <EmptyState title="No tasks this month" copy="Tasks with expected start date in this month will appear here." />
         ) : (
           <div className="list-stack visit-month-schedule-list">
-            {monthlyScheduledItems.map((item) => (
-              <article key={item.key} className="list-card visit-list-card visit-list-card--scheduled">
-                <div className="list-head">
-                  <div className="list-head-copy">
-                    <h4 className="list-title">{item.customerName}</h4>
-                    <p className="panel-subtitle">{item.subject || "Scheduled visit"}</p>
+            {calendarMode === "visit"
+              ? monthlyScheduledItems.map((item) => (
+                <article key={item.key} className="list-card visit-list-card visit-list-card--scheduled">
+                  <div className="list-head">
+                    <div className="list-head-copy">
+                      <h4 className="list-title">{item.customerName}</h4>
+                      <p className="panel-subtitle">{item.subject || "Scheduled visit"}</p>
+                    </div>
+                    <span className={`badge ${statusBadgeClass(item.displayStatus)}`}>
+                      {item.rawStatus || "Scheduled"}
+                    </span>
                   </div>
-                  <span className={`badge ${statusBadgeClass(item.displayStatus)}`}>
-                    {item.rawStatus || "Scheduled"}
-                  </span>
-                </div>
-                <div className="visit-meta-row">
-                  <span>{formatDateShortLabel(item.date)}</span>
-                  <span>{formatTimeLabel(item.fromTime, item.fromTimeUtc) || "Time not set"}</span>
-                  <span>{item.taskId}</span>
-                </div>
-              </article>
-            ))}
+                  <div className="visit-meta-row">
+                    <span>{formatDateShortLabel(item.date)}</span>
+                    <span>{formatTimeLabel(item.fromTime, item.fromTimeUtc) || "Time not set"}</span>
+                    <span>{item.taskId}</span>
+                  </div>
+                </article>
+              ))
+              : Object.entries(taskData)
+                .flatMap(([date, rows]) => rows.map((task) => ({ date, task })))
+                .sort((a, b) => (a.date === b.date ? a.task.subject.localeCompare(b.task.subject) : a.date.localeCompare(b.date)))
+                .map(({ date, task }) => (
+                  <article key={`${task.taskId}-${date}`} className="list-card visit-list-card visit-list-card--scheduled">
+                    <div className="list-head">
+                      <div className="list-head-copy">
+                        <h4 className="list-title">{task.customerName || "No customer"}</h4>
+                        <p className="panel-subtitle">{task.subject}</p>
+                      </div>
+                      <span className={`badge ${statusBadgeClass(task.status, task.isOverdue)}`}>{task.status}</span>
+                    </div>
+                    <div className="visit-meta-row">
+                      <span>{formatDateShortLabel(date)}</span>
+                      <span>{task.projectName || "No project"}</span>
+                      <span>{task.taskId}</span>
+                    </div>
+                  </article>
+                ))}
           </div>
         )}
       </Panel>
 
-      {isDetailsOpen ? (
+      {isDetailsOpen && calendarMode === "visit" ? (
         <VisitDetailsModal
           date={selectedDate}
           items={selectedItems}
           onClose={() => setIsDetailsOpen(false)}
         />
+      ) : null}
+      {isDetailsOpen && calendarMode === "task" ? (
+        <Modal
+          title={formatDayLabel(selectedDate)}
+          subtitle="Tasks planned for this date and current status."
+          onClose={() => setIsDetailsOpen(false)}
+          size="wide"
+        >
+          {selectedTasks.length === 0 ? (
+            <EmptyState title="No tasks on this date" copy="Choose another day to see tasks." />
+          ) : (
+            <div className="list-stack">
+              {selectedTasks.map((task) => (
+                <article key={task.taskId} className="list-card">
+                  <div className="list-head">
+                    <div className="list-head-copy">
+                      <h4 className="list-title">{task.subject}</h4>
+                      <p className="panel-subtitle">{task.customerName || "No customer"}</p>
+                    </div>
+                    <span className={`badge ${statusBadgeClass(task.status, task.isOverdue)}`}>{task.status}</span>
+                  </div>
+                  <div className="visit-meta-row">
+                    <span>{task.projectName || "No project"}</span>
+                    <span>{task.ownerName || "No owner"}</span>
+                    <span>{task.taskId}</span>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </Modal>
       ) : null}
     </div>
   );

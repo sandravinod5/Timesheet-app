@@ -19,7 +19,7 @@ const navItems = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
   { href: "/tasks", label: "Tasks", icon: CheckSquare },
   { href: "/timesheet", label: "Timesheet", icon: Clock3 },
-  { href: "/visits", label: "Visits", icon: CalendarDays },
+  { href: "/visits", label: "Calendar", icon: CalendarDays },
   { href: "/reports", label: "Reports", icon: BarChart3 }
 ];
 
