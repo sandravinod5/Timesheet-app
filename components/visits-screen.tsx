@@ -286,7 +286,7 @@ function VisitDetailsModal({
 }
 
 export function VisitsScreen() {
-  const [calendarMode, setCalendarMode] = useState<"visit" | "task">("visit");
+  const [calendarMode, setCalendarMode] = useState<"visit" | "task">("task");
   const [monthCursor, setMonthCursor] = useState(firstOfMonth(new Date()));
   const [selectedDate, setSelectedDate] = useState(dateKey(new Date()));
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -573,6 +573,17 @@ export function VisitsScreen() {
 
   const currentCalendarData = calendarMode === "visit" ? visitData : taskData;
 
+  const flipToMode = (targetMode: "visit" | "task") => {
+    if (targetMode === calendarMode) {
+      return;
+    }
+    setCalendarFlipClass(targetMode === "visit" ? "is-flip-to-visit" : "is-flip-to-task");
+    window.setTimeout(() => {
+      setCalendarMode(targetMode);
+      window.setTimeout(() => setCalendarFlipClass(""), 260);
+    }, 210);
+  };
+
   if (loading && !timesheetData && tasks.length === 0) {
     return <LoadingState label="Loading visits..." />;
   }
@@ -649,17 +660,7 @@ export function VisitsScreen() {
             return;
           }
           const targetMode: "visit" | "task" = delta < 0 ? "task" : "visit";
-          if (targetMode === calendarMode) {
-            setTouchStartX(null);
-            return;
-          }
-
-          setCalendarFlipClass(delta < 0 ? "is-flipping-left" : "is-flipping-right");
-          window.setTimeout(() => {
-            setCalendarMode(targetMode);
-            setCalendarFlipClass("is-flip-enter");
-            window.setTimeout(() => setCalendarFlipClass(""), 220);
-          }, 140);
+          flipToMode(targetMode);
           setTouchStartX(null);
         }}
       >
@@ -667,14 +668,14 @@ export function VisitsScreen() {
           <button
             type="button"
             className={calendarMode === "visit" ? "calendar-mode-btn is-active" : "calendar-mode-btn"}
-            onClick={() => setCalendarMode("visit")}
+            onClick={() => flipToMode("visit")}
           >
             Visit Calendar
           </button>
           <button
             type="button"
             className={calendarMode === "task" ? "calendar-mode-btn is-active" : "calendar-mode-btn"}
-            onClick={() => setCalendarMode("task")}
+            onClick={() => flipToMode("task")}
           >
             Task Calendar
           </button>
