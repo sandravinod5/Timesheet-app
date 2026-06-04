@@ -14,15 +14,25 @@ import {
 import { fetchAction } from "@/lib/client";
 import { formatLocalTime, getElapsedSeconds, parseApiDateTime } from "@/lib/datetime";
 import { showSystemNotification } from "@/lib/notifications";
-import type { ActivityTypeOption, ActivityTypesData, OverviewData, Task, TimesheetsData } from "@/lib/types";
+import type { ActivityTypeOption, ActivityTypesData, OverviewData, Task, TaskFormOptionsData, TimesheetsData } from "@/lib/types";
 import { formatDuration, formatHours, formatWorkedTime, statusBadgeClass } from "@/lib/utils";
 import { EmptyState, LoadingState, OverviewSkeleton, Panel } from "@/components/ui";
 import { KpiModal } from "@/components/kpi-modal";
+import { StopTimerStatusModal } from "@/components/stop-timer-status-modal";
 import { useToast } from "@/components/toast-provider";
 import { TimerModal } from "@/components/timer-modal";
 
 const STANDARD_HOURS_PER_DAY = 7;
 const POLL_INTERVAL_MS = 15 * 1000;
+const EMPTY_TASK_FORM_OPTIONS: TaskFormOptionsData = {
+  projectTypes: [],
+  statuses: [],
+  statusesByProjectType: {},
+  customers: [],
+  projects: [],
+  months: [],
+  reports: []
+};
 
 function formatClockTime(value?: string | null, utcValue?: string | null) {
   return formatLocalTime(value, utcValue) || "-";
@@ -67,6 +77,9 @@ export function OverviewScreen() {
   const [recentError, setRecentError] = useState<string | null>(null);
   const [kpiType, setKpiType] = useState<string | null>(null);
   const [showTimerModal, setShowTimerModal] = useState(false);
+  const [showStopTimerModal, setShowStopTimerModal] = useState(false);
+  const [taskFormOptions, setTaskFormOptions] = useState<TaskFormOptionsData>(EMPTY_TASK_FORM_OPTIONS);
+  const [stopStatusValue, setStopStatusValue] = useState("");
   const [recentTimesheetsOpen, setRecentTimesheetsOpen] = useState(false);
   const [recentVisitsOpen, setRecentVisitsOpen] = useState(false);
   const [recentTaskWorkOpen, setRecentTaskWorkOpen] = useState(false);
@@ -348,6 +361,7 @@ export function OverviewScreen() {
   };
 
   const stopTimer = async () => {
+    setShowStopTimerModal(false);
     try {
       const response = await fetchAction<{
         message?: string;
@@ -374,6 +388,55 @@ export function OverviewScreen() {
     } catch (err) {
       showToast({
         title: "Unable to stop timer",
+        message: err instanceof Error ? err.message : "Please try again.",
+        variant: "error"
+      });
+    }
+  };
+
+  const runningTask = useMemo(() => {
+    const runningTaskId = data?.runningTimer?.task;
+    if (!runningTaskId) {
+      return null;
+    }
+
+    return tasks.find((task) => task.taskId === runningTaskId) ?? null;
+  }, [data?.runningTimer?.task, tasks]);
+
+  const stopStatusOptions = useMemo(() => {
+    const projectType = runningTask?.customProjectType || "";
+    const mapped = taskFormOptions.statusesByProjectType[projectType] || [];
+    const source = mapped.length > 0 ? mapped : taskFormOptions.statuses;
+    return [...source].sort((a, b) => a.label.localeCompare(b.label));
+  }, [runningTask?.customProjectType, taskFormOptions]);
+
+  const openStopTimerModal = async () => {
+    try {
+      const response = await fetchAction<TaskFormOptionsData>("task_form_options");
+      setTaskFormOptions(response.data);
+    } catch {
+      setTaskFormOptions(EMPTY_TASK_FORM_OPTIONS);
+    }
+    setStopStatusValue("");
+    setShowStopTimerModal(true);
+  };
+
+  const updateStatusAndStopTimer = async () => {
+    const taskId = data?.runningTimer?.task;
+    if (!taskId || !stopStatusValue) {
+      await stopTimer();
+      return;
+    }
+
+    try {
+      await fetchAction("update_task_status", {
+        task_id: taskId,
+        status: stopStatusValue
+      }, "POST");
+      await stopTimer();
+    } catch (err) {
+      showToast({
+        title: "Unable to update status",
         message: err instanceof Error ? err.message : "Please try again.",
         variant: "error"
       });
@@ -479,7 +542,7 @@ export function OverviewScreen() {
 
             <div className="timer-fab-row">
               {timerRunning ? (
-                <button className="timer-action-button timer-action-button-stop" onClick={() => void stopTimer()}>
+                <button className="timer-action-button timer-action-button-stop" onClick={() => void openStopTimerModal()}>
                   <Square size={18} />
                   Stop Timer
                 </button>
@@ -756,6 +819,19 @@ export function OverviewScreen() {
         activityTypes={activityTypes}
         onClose={() => setShowTimerModal(false)}
         onStart={startTimer}
+      />
+      <StopTimerStatusModal
+        open={showStopTimerModal}
+        taskSubject={data.runningTimer?.taskSubject || ""}
+        projectName={data.runningTimer?.projectName || runningTask?.projectName || ""}
+        currentStatus={runningTask?.rawStatus || runningTask?.status || ""}
+        statusValue={stopStatusValue}
+        statusOptions={stopStatusOptions}
+        onStatusChange={setStopStatusValue}
+        onClose={() => setShowStopTimerModal(false)}
+        onSkipAndStop={() => void stopTimer()}
+        onUpdateAndStop={() => void updateStatusAndStopTimer()}
+        submitting={false}
       />
     </>
   );

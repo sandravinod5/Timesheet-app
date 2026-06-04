@@ -136,6 +136,21 @@ export type ActivityTypeOption = {
   customParentGroup?: string | null;
 };
 
+export type SelectOption = {
+  value: string;
+  label: string;
+};
+
+export type TaskFormOptionsData = {
+  projectTypes: SelectOption[];
+  statuses: SelectOption[];
+  statusesByProjectType: Record<string, SelectOption[]>;
+  customers: SelectOption[];
+  projects: SelectOption[];
+  months: SelectOption[];
+  reports: SelectOption[];
+};
+
 export type LeaveBreakdown = {
   leaveType: string;
   days: number;

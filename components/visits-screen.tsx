@@ -1,19 +1,20 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
   Clock3,
   MapPinned,
+  Plus,
   Sparkles
 } from "lucide-react";
 import { fetchAction } from "@/lib/client";
 import { formatLocalDate, formatLocalTime, getDateKeyFromDateTime, parseApiDateTime } from "@/lib/datetime";
-import type { Task, TimesheetsData } from "@/lib/types";
+import type { SelectOption, Task, TaskFormOptionsData, TimesheetsData } from "@/lib/types";
 import { formatWorkedTime, statusBadgeClass } from "@/lib/utils";
-import { EmptyState, LoadingState, Modal, Panel } from "@/components/ui";
+import { EmptyState, InputShell, LoadingState, Modal, Panel } from "@/components/ui";
 
 type VisitItem = {
   key: string;
@@ -35,6 +36,146 @@ type VisitItem = {
 
 const VISIT_PROJECT_TYPES = ["client visit strategy", "partners client visit strategy"];
 const WEEK_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const EMPTY_TASK_FORM_OPTIONS: TaskFormOptionsData = {
+  projectTypes: [],
+  statuses: [],
+  statusesByProjectType: {},
+  customers: [],
+  projects: [],
+  months: [],
+  reports: []
+};
+
+function SearchableSelectField({
+  className,
+  label,
+  ariaLabel,
+  placeholder,
+  value,
+  options,
+  onChange
+}: {
+  className?: string;
+  label: string;
+  ariaLabel: string;
+  placeholder: string;
+  value: string;
+  options: SelectOption[];
+  onChange: (value: string) => void;
+}) {
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const selectedOption = useMemo(
+    () => options.find((option) => option.value === value) ?? null,
+    [options, value]
+  );
+  const [inputValue, setInputValue] = useState(selectedOption?.label || value || "");
+  const [isOpen, setIsOpen] = useState(false);
+
+  useEffect(() => {
+    setInputValue(selectedOption?.label || value || "");
+  }, [selectedOption, value]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+        commitValue(inputValue);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [inputValue, isOpen, options, selectedOption, value]);
+
+  const normalize = (text: string) => text.trim().toLowerCase();
+  const filteredOptions = useMemo(() => {
+    const query = normalize(inputValue);
+    if (!query) {
+      return options;
+    }
+
+    return options.filter((option) =>
+      normalize(option.label).includes(query) || normalize(option.value).includes(query)
+    );
+  }, [inputValue, options]);
+
+  const commitValue = (rawValue: string) => {
+    const next = options.find((option) => {
+      const normalized = normalize(rawValue);
+      return normalize(option.label) === normalized || normalize(option.value) === normalized;
+    });
+
+    if (next) {
+      onChange(next.value);
+      setInputValue(next.label);
+      return;
+    }
+
+    if (!rawValue.trim()) {
+      onChange("");
+      setInputValue("");
+      return;
+    }
+
+    setInputValue(selectedOption?.label || value || "");
+  };
+
+  const handleSelect = (option: SelectOption) => {
+    onChange(option.value);
+    setInputValue(option.label);
+    setIsOpen(false);
+  };
+
+  return (
+    <div ref={rootRef} className={["task-create-field", className].filter(Boolean).join(" ")}>
+      <label className="report-date-label">{label}</label>
+      <InputShell className="searchable-select-shell">
+        <input
+          className="searchable-select-input"
+          value={inputValue}
+          onChange={(event) => {
+            setInputValue(event.target.value);
+            setIsOpen(true);
+          }}
+          onFocus={() => setIsOpen(true)}
+          aria-label={ariaLabel}
+          placeholder={placeholder}
+        />
+        <button
+          type="button"
+          className="searchable-select-toggle"
+          aria-label={`Open ${ariaLabel}`}
+          onClick={() => setIsOpen((current) => !current)}
+        >
+          ▾
+        </button>
+      </InputShell>
+      {isOpen ? (
+        <div className="searchable-select-menu">
+          {filteredOptions.length > 0 ? (
+            filteredOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={option.value === value ? "searchable-select-option is-active" : "searchable-select-option"}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => handleSelect(option)}
+              >
+                {option.label}
+              </button>
+            ))
+          ) : (
+            <div className="searchable-select-empty">No matches found</div>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 function pad(value: number) {
   return String(value).padStart(2, "0");
@@ -104,6 +245,25 @@ function formatTimeLabel(value?: string | null, utcValue?: string | null) {
 
 function formatDateShortLabel(value: string) {
   return formatLocalDate(value) || value;
+}
+
+function buildGeneratedTaskSubject({
+  project,
+  customer,
+  report,
+  startDate
+}: {
+  project: string;
+  customer: string;
+  report: string;
+  startDate: string;
+}) {
+  const parts = [project, customer, report].map((value) => value.trim()).filter(Boolean);
+  if (parts.length > 0) {
+    return `${parts.join(" - ")} - ${startDate}`;
+  }
+
+  return `Task - ${startDate}`;
 }
 
 function isVisitProjectType(value?: string | null) {
@@ -291,50 +451,71 @@ export function VisitsScreen() {
   const [selectedDate, setSelectedDate] = useState(dateKey(new Date()));
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
-  const [calendarFlipClass, setCalendarFlipClass] = useState("");
   const [tasks, setTasks] = useState<Task[]>([]);
   const [timesheetData, setTimesheetData] = useState<TimesheetsData | null>(null);
+  const [taskFormOptions, setTaskFormOptions] = useState<TaskFormOptionsData>(EMPTY_TASK_FORM_OPTIONS);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showAddTaskForm, setShowAddTaskForm] = useState(false);
+  const [newTaskProjectType, setNewTaskProjectType] = useState("");
+  const [newTaskProject, setNewTaskProject] = useState("");
+  const [newTaskCustomer, setNewTaskCustomer] = useState("");
+  const [newTaskMonth, setNewTaskMonth] = useState("");
+  const [newTaskReport, setNewTaskReport] = useState("");
+  const [newTaskCustomStatus, setNewTaskCustomStatus] = useState("");
+  const [newTaskStartDate, setNewTaskStartDate] = useState(dateKey(new Date()));
+  const [newTaskCompletionDate, setNewTaskCompletionDate] = useState(dateKey(new Date()));
+  const [addingTask, setAddingTask] = useState(false);
+  const [addTaskError, setAddTaskError] = useState<string | null>(null);
+
+  const loadCalendarData = async () => {
+    setLoading(true);
+    setError(null);
+
+    const fromDate = dateKey(firstOfMonth(monthCursor));
+    const toDate = dateKey(endOfMonth(monthCursor));
+
+    const [tasksResult, timesheetsResult, formOptionsResult] = await Promise.allSettled([
+      fetchAction<{ tasks: Task[] }>("tasks"),
+      fetchAction<TimesheetsData>("timesheets", {
+        from_date: fromDate,
+        to_date: toDate
+      }),
+      fetchAction<TaskFormOptionsData>("task_form_options")
+    ]);
+
+    if (tasksResult.status === "fulfilled") {
+      setTasks(tasksResult.value.data.tasks);
+    } else {
+      setTasks([]);
+      setError(tasksResult.reason instanceof Error ? tasksResult.reason.message : "Tasks could not be loaded.");
+    }
+
+    if (timesheetsResult.status === "fulfilled") {
+      setTimesheetData(timesheetsResult.value.data);
+    } else {
+      setTimesheetData(null);
+      setError(
+        timesheetsResult.reason instanceof Error
+          ? timesheetsResult.reason.message
+          : "Visit timesheets could not be loaded."
+      );
+    }
+
+    if (formOptionsResult.status === "fulfilled") {
+      const options = formOptionsResult.value.data;
+      setTaskFormOptions(options);
+      setNewTaskCustomStatus((current) => current || "");
+    } else {
+      setTaskFormOptions(EMPTY_TASK_FORM_OPTIONS);
+      setNewTaskCustomStatus((current) => current || "");
+    }
+
+    setLoading(false);
+  };
 
   useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      setError(null);
-
-      const fromDate = dateKey(firstOfMonth(monthCursor));
-      const toDate = dateKey(endOfMonth(monthCursor));
-
-      const [tasksResult, timesheetsResult] = await Promise.allSettled([
-        fetchAction<{ tasks: Task[] }>("tasks"),
-        fetchAction<TimesheetsData>("timesheets", {
-          from_date: fromDate,
-          to_date: toDate
-        })
-      ]);
-
-      if (tasksResult.status === "fulfilled") {
-        setTasks(tasksResult.value.data.tasks);
-      } else {
-        setTasks([]);
-        setError(tasksResult.reason instanceof Error ? tasksResult.reason.message : "Tasks could not be loaded.");
-      }
-
-      if (timesheetsResult.status === "fulfilled") {
-        setTimesheetData(timesheetsResult.value.data);
-      } else {
-        setTimesheetData(null);
-        setError(
-          timesheetsResult.reason instanceof Error
-            ? timesheetsResult.reason.message
-            : "Visit timesheets could not be loaded."
-        );
-      }
-
-      setLoading(false);
-    };
-
-    void load();
+    void loadCalendarData();
   }, [monthCursor]);
 
   const visitTaskMap = useMemo(() => {
@@ -575,11 +756,68 @@ export function VisitsScreen() {
     if (targetMode === calendarMode) {
       return;
     }
-    setCalendarFlipClass(targetMode === "visit" ? "is-flip-to-visit" : "is-flip-to-task");
-    window.setTimeout(() => {
-      setCalendarMode(targetMode);
-      window.setTimeout(() => setCalendarFlipClass(""), 260);
-    }, 210);
+    setCalendarMode(targetMode);
+  };
+
+  const availableStatusOptions = useMemo(() => {
+    const byProjectType = taskFormOptions.statusesByProjectType[newTaskProjectType] || [];
+    const source = byProjectType.length > 0 ? byProjectType : taskFormOptions.statuses;
+    return [...source].sort((a, b) => a.label.localeCompare(b.label));
+  }, [newTaskProjectType, taskFormOptions]);
+
+  useEffect(() => {
+    setNewTaskCustomStatus((current) => {
+      if (availableStatusOptions.some((option) => option.value === current)) {
+        return current;
+      }
+
+      return "";
+    });
+  }, [availableStatusOptions]);
+
+  const handleCreateTaskForDate = async () => {
+    if (addingTask || !newTaskStartDate || !newTaskCompletionDate) {
+      return;
+    }
+
+    const subject = buildGeneratedTaskSubject({
+      project: newTaskProject,
+      customer: newTaskCustomer,
+      report: newTaskReport,
+      startDate: newTaskStartDate
+    });
+
+    setAddingTask(true);
+    setAddTaskError(null);
+    try {
+      await fetchAction("create_task", {
+        subject,
+        task_name: subject,
+        custom_project_type: newTaskProjectType,
+        project: newTaskProject,
+        custom_customer: newTaskCustomer,
+        custom_month: newTaskMonth,
+        custom_reports: newTaskReport,
+        custom_custom_status: newTaskCustomStatus,
+        status: newTaskCustomStatus,
+        exp_start_date: newTaskStartDate,
+        completion_date: newTaskCompletionDate
+      }, "POST");
+      setNewTaskProjectType("");
+      setNewTaskProject("");
+      setNewTaskCustomer("");
+      setNewTaskMonth("");
+      setNewTaskReport("");
+      setNewTaskCustomStatus("");
+      setNewTaskStartDate(selectedDate);
+      setNewTaskCompletionDate(selectedDate);
+      setShowAddTaskForm(false);
+      await loadCalendarData();
+    } catch (createError) {
+      setAddTaskError(createError instanceof Error ? createError.message : "Task could not be created.");
+    } finally {
+      setAddingTask(false);
+    }
   };
 
   if (loading && !timesheetData && tasks.length === 0) {
@@ -644,7 +882,7 @@ export function VisitsScreen() {
       </Panel>
 
       <Panel
-        className={`visit-calendar-panel visits-calendar-main ${calendarFlipClass}`.trim()}
+        className="visit-calendar-panel visits-calendar-main"
         onTouchStart={(event) => setTouchStartX(event.changedTouches[0]?.clientX ?? null)}
         onTouchEnd={(event) => {
           const endX = event.changedTouches[0]?.clientX;
@@ -868,6 +1106,108 @@ export function VisitsScreen() {
           onClose={() => setIsDetailsOpen(false)}
           size="wide"
         >
+          <div className="task-modal-actions">
+            <button
+              type="button"
+              className="ghost-button task-modal-add-btn"
+              aria-label="Add task for this date"
+              title="Add task for this date"
+              onClick={() => {
+                setAddTaskError(null);
+                setNewTaskStartDate(selectedDate);
+                setNewTaskCompletionDate(selectedDate);
+                setShowAddTaskForm((current) => !current);
+              }}
+            >
+              <Plus size={18} />
+            </button>
+          </div>
+          {showAddTaskForm ? (
+            <div className="task-create-form">
+              <SearchableSelectField
+                label="Custom Project Type"
+                ariaLabel="Project type"
+                placeholder="Search project type"
+                value={newTaskProjectType}
+                options={taskFormOptions.projectTypes}
+                onChange={setNewTaskProjectType}
+              />
+              <SearchableSelectField
+                label="Project"
+                ariaLabel="Project"
+                placeholder="Search project"
+                value={newTaskProject}
+                options={taskFormOptions.projects}
+                onChange={setNewTaskProject}
+              />
+              <SearchableSelectField
+                className="task-create-field--full"
+                label="Custom Customer"
+                ariaLabel="Customer"
+                placeholder="Search customer"
+                value={newTaskCustomer}
+                options={taskFormOptions.customers}
+                onChange={setNewTaskCustomer}
+              />
+              <SearchableSelectField
+                label="Custom Month"
+                ariaLabel="Custom month"
+                placeholder="Search period"
+                value={newTaskMonth}
+                options={taskFormOptions.months}
+                onChange={setNewTaskMonth}
+              />
+              <SearchableSelectField
+                label="Custom Reports"
+                ariaLabel="Custom report"
+                placeholder="Search task type"
+                value={newTaskReport}
+                options={taskFormOptions.reports}
+                onChange={setNewTaskReport}
+              />
+              <div className="task-create-field">
+                <label className="report-date-label">Exp Start Date</label>
+                <input
+                  type="date"
+                  className="report-date-input"
+                  value={newTaskStartDate}
+                  onChange={(event) => setNewTaskStartDate(event.target.value)}
+                  aria-label="Expected start date"
+                />
+              </div>
+              <div className="task-create-field">
+                <label className="report-date-label">Completion Date</label>
+                <input
+                  type="date"
+                  className="report-date-input"
+                  value={newTaskCompletionDate}
+                  min={newTaskStartDate || undefined}
+                  onChange={(event) => setNewTaskCompletionDate(event.target.value)}
+                  aria-label="Completion date"
+                />
+              </div>
+              <SearchableSelectField
+                className="task-create-field--full"
+                label="Custom Status"
+                ariaLabel="Custom status"
+                placeholder={newTaskProjectType ? "Search status" : "Select project type first"}
+                value={newTaskCustomStatus}
+                options={availableStatusOptions}
+                onChange={setNewTaskCustomStatus}
+              />
+              <div className="task-create-submit">
+              <button
+                type="button"
+                className="button"
+                disabled={addingTask || !newTaskStartDate || !newTaskCompletionDate}
+                onClick={() => void handleCreateTaskForDate()}
+              >
+                {addingTask ? "Adding..." : `Add for ${formatDateShortLabel(selectedDate)}`}
+              </button>
+              </div>
+              {addTaskError ? <p className="empty-copy">{addTaskError}</p> : null}
+            </div>
+          ) : null}
           {selectedTasks.length === 0 ? (
             <EmptyState title="No tasks on this date" copy="Choose another day to see tasks." />
           ) : (

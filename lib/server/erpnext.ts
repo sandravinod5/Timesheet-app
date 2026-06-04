@@ -283,3 +283,157 @@ export async function callErpNextMobileApp(
 
   return (payload.message as Record<string, unknown>) || payload;
 }
+
+export async function fetchErpNextResourceList(
+  doctype: string,
+  options?: {
+    fields?: string[];
+    filters?: Record<string, string | number>;
+    orderBy?: string;
+    sid?: string;
+  }
+) {
+  if (!baseUrl) {
+    throw new Error("ERPNEXT_BASE_URL is not configured.");
+  }
+
+  const query = new URLSearchParams();
+  query.set("limit_page_length", "0");
+
+  if (options?.fields?.length) {
+    query.set("fields", JSON.stringify(options.fields));
+  }
+
+  if (options?.filters && Object.keys(options.filters).length > 0) {
+    query.set("filters", JSON.stringify(options.filters));
+  }
+
+  if (options?.orderBy) {
+    query.set("order_by", options.orderBy);
+  }
+
+  const url = `${baseUrl}/api/resource/${encodeURIComponent(doctype)}?${query.toString()}`;
+  let response = await fetch(url, {
+    method: "GET",
+    headers: {
+      Accept: "application/json",
+      ...getAuthHeaders(options?.sid)
+    },
+    cache: "no-store"
+  });
+
+  if (!response.ok && options?.sid && apiKey && apiSecret) {
+    response = await fetch(url, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        ...getAuthHeaders(undefined)
+      },
+      cache: "no-store"
+    });
+  }
+
+  const payload = (await response.json().catch(() => ({}))) as {
+    data?: Array<Record<string, unknown>>;
+    message?: unknown;
+    exception?: string;
+    exc?: string;
+  };
+
+  if (!response.ok) {
+    throw new Error(extractErpErrorMessage(payload));
+  }
+
+  return payload.data ?? [];
+}
+
+export async function fetchErpNextResourceDoc(
+  doctype: string,
+  name: string,
+  sid?: string
+) {
+  if (!baseUrl) {
+    throw new Error("ERPNEXT_BASE_URL is not configured.");
+  }
+
+  const url = `${baseUrl}/api/resource/${encodeURIComponent(doctype)}/${encodeURIComponent(name)}`;
+  let response = await fetch(url, {
+    method: "GET",
+    headers: {
+      Accept: "application/json",
+      ...getAuthHeaders(sid)
+    },
+    cache: "no-store"
+  });
+
+  if (!response.ok && sid && apiKey && apiSecret) {
+    response = await fetch(url, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        ...getAuthHeaders(undefined)
+      },
+      cache: "no-store"
+    });
+  }
+
+  const payload = (await response.json().catch(() => ({}))) as {
+    data?: Record<string, unknown>;
+    message?: unknown;
+    exception?: string;
+    exc?: string;
+  };
+
+  if (!response.ok) {
+    throw new Error(extractErpErrorMessage(payload));
+  }
+
+  return payload.data ?? {};
+}
+
+export async function updateErpNextResourceDoc(
+  doctype: string,
+  name: string,
+  values: Record<string, unknown>,
+  sid?: string
+) {
+  if (!baseUrl) {
+    throw new Error("ERPNEXT_BASE_URL is not configured.");
+  }
+
+  const url = `${baseUrl}/api/resource/${encodeURIComponent(doctype)}/${encodeURIComponent(name)}`;
+  const attempt = async (headers: Record<string, string>) => {
+    const response = await fetch(url, {
+      method: "PUT",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        ...headers
+      },
+      body: JSON.stringify(values),
+      cache: "no-store"
+    });
+
+    const payload = (await response.json().catch(() => ({}))) as {
+      data?: Record<string, unknown>;
+      message?: unknown;
+      exception?: string;
+      exc?: string;
+    };
+
+    if (!response.ok) {
+      throw new Error(extractErpErrorMessage(payload));
+    }
+
+    return payload.data ?? {};
+  };
+
+  try {
+    return await attempt(getAuthHeaders(sid));
+  } catch (error) {
+    if (sid && apiKey && apiSecret) {
+      return attempt(getAuthHeaders(undefined));
+    }
+    throw error;
+  }
+}

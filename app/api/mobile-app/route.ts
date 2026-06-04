@@ -1,4 +1,4 @@
-import { callErpNextMobileApp } from "@/lib/server/erpnext";
+import { callErpNextMobileApp, fetchErpNextResourceDoc, fetchErpNextResourceList, updateErpNextResourceDoc } from "@/lib/server/erpnext";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -327,6 +327,163 @@ function formatErrorMessage(error: unknown) {
   return "ERPNext request could not be completed.";
 }
 
+function toOption(
+  row: Record<string, unknown>,
+  valueKey: string,
+  labelKeys: string[]
+) {
+  const value = typeof row[valueKey] === "string" ? row[valueKey] : "";
+  if (!value) {
+    return null;
+  }
+
+  for (const key of labelKeys) {
+    const candidate = typeof row[key] === "string" ? row[key] : "";
+    if (candidate) {
+      return { value, label: candidate };
+    }
+  }
+
+  return { value, label: value };
+}
+
+async function getTaskFormOptionsDirect(sid?: string) {
+  const [taskMasterRows, statusMasterRows, customerRows, projectRows, taskRowsResult] = await Promise.all([
+    fetchErpNextResourceList("Task Master", {
+      fields: ["name", "master"],
+      orderBy: "modified desc",
+      sid
+    }),
+    fetchErpNextResourceList("Status Master", {
+      fields: ["name"],
+      orderBy: "name asc",
+      sid
+    }),
+    fetchErpNextResourceList("Customer", {
+      fields: ["name", "customer_name"],
+      orderBy: "customer_name asc",
+      sid
+    }),
+    fetchErpNextResourceList("Project", {
+      fields: ["name", "project_name"],
+      orderBy: "project_name asc",
+      sid
+    }),
+    (async () => {
+      try {
+        return await fetchErpNextResourceList("Task", {
+          fields: ["custom_month", "custom_reports"],
+          orderBy: "modified desc",
+          sid
+        });
+      } catch {
+        try {
+          return await fetchErpNextResourceList("Task", {
+            fields: ["custom_month"],
+            orderBy: "modified desc",
+            sid
+          });
+        } catch {
+          return [];
+        }
+      }
+    })()
+  ]);
+
+  const taskRows = taskRowsResult;
+
+  const taskMasterDocs = await Promise.all(
+    taskMasterRows.map(async (row) => {
+      const name = typeof row.name === "string" ? row.name : "";
+      if (!name) {
+        return null;
+      }
+
+      try {
+        return await fetchErpNextResourceDoc("Task Master", name, sid);
+      } catch {
+        return null;
+      }
+    })
+  );
+
+  const uniqByValue = (items: Array<{ value: string; label: string } | null>) =>
+    Array.from(
+      new Map(
+        items
+          .filter((item): item is { value: string; label: string } => Boolean(item?.value))
+          .map((item) => [item.value, item])
+      ).values()
+    );
+
+  const months = uniqByValue(
+    taskRows.map((row) => {
+      const value =
+        (typeof row.custom_month === "string" && row.custom_month) ||
+        "";
+      return value ? { value, label: value } : null;
+    })
+  ).sort((a, b) => a.label.localeCompare(b.label));
+
+  const reports = uniqByValue(
+    taskRows.map((row) => {
+      const value =
+        (typeof row.custom_reports === "string" && row.custom_reports) ||
+        "";
+      return value ? { value, label: value } : null;
+    })
+  ).sort((a, b) => a.label.localeCompare(b.label));
+
+  const projectTypes = uniqByValue(
+    taskMasterRows.map((row) => {
+      const masterValue = typeof row.master === "string" ? row.master.trim() : "";
+      const fallbackName = typeof row.name === "string" ? row.name.trim() : "";
+      const value = masterValue || fallbackName;
+      return value ? { value, label: value } : null;
+    })
+  ).sort((a, b) => a.label.localeCompare(b.label));
+
+  const statusesByProjectType = Object.fromEntries(
+    taskMasterDocs
+      .map((doc) => {
+        if (!doc) {
+          return null;
+        }
+
+        const masterValue =
+          (typeof doc.master === "string" && doc.master.trim()) ||
+          (typeof doc.name === "string" && doc.name.trim()) ||
+          "";
+
+        if (!masterValue) {
+          return null;
+        }
+
+        const childRows = Array.isArray(doc.status) ? doc.status : [];
+        const options = uniqByValue(
+          childRows.map((row) => {
+            const child = row as Record<string, unknown>;
+            const value = typeof child.status === "string" ? child.status.trim() : "";
+            return value ? { value, label: value } : null;
+          })
+        ).sort((a, b) => a.label.localeCompare(b.label));
+
+        return [masterValue, options] as const;
+      })
+      .filter((entry): entry is readonly [string, { value: string; label: string }[]] => Boolean(entry))
+  );
+
+  return {
+    projectTypes,
+    statuses: uniqByValue(statusMasterRows.map((row) => toOption(row, "name", ["name"]))),
+    statusesByProjectType,
+    customers: uniqByValue(customerRows.map((row) => toOption(row, "name", ["customer_name", "name"]))),
+    projects: uniqByValue(projectRows.map((row) => toOption(row, "name", ["project_name", "name"]))),
+    months,
+    reports
+  };
+}
+
 function isUnsupportedActivityTypesError(action: string, error: unknown) {
   if (action !== "activity_types") {
     return false;
@@ -375,6 +532,53 @@ async function handleRequest(request: NextRequest) {
   }
 
   try {
+    if (action === "task_form_options") {
+      const data = await getTaskFormOptionsDirect(sid);
+      return NextResponse.json({
+        success: true,
+        action,
+        data,
+        error: null
+      });
+    }
+
+    if (action === "update_task_status") {
+      const taskId = params.task_id || params.taskId;
+      const status = params.status;
+
+      if (!taskId || !status) {
+        return NextResponse.json(
+          {
+            success: false,
+            action,
+            data: null,
+            error: "task_id and status are required"
+          },
+          { status: 400 }
+        );
+      }
+
+      const updated = await updateErpNextResourceDoc(
+        "Task",
+        taskId,
+        {
+          status,
+          custom_custom_status: status
+        },
+        sid
+      );
+
+      return NextResponse.json({
+        success: true,
+        action,
+        data: {
+          message: "Task status updated",
+          task: updated
+        },
+        error: null
+      });
+    }
+
     const payload = await callErpNextMobileApp(action, params, sid);
     const normalizedPayload = attachUtcDateTimes(normalizeKeys(payload)) as Record<string, unknown>;
     const filteredPayload = filterPayloadForCurrentUser(action, normalizedPayload, currentUser);

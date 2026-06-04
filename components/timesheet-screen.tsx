@@ -5,14 +5,24 @@ import { useEffect, useMemo, useState } from "react";
 import { fetchAction } from "@/lib/client";
 import { formatDateTimeLocalInput, formatLocalDateTime } from "@/lib/datetime";
 import { requestNotificationPermission, shouldSendNotification, showSystemNotification, getNotificationPermissionState } from "@/lib/notifications";
-import type { ActivityTypeOption, ActivityTypesData, DraftEntry, DraftsData, Task, TimesheetsData } from "@/lib/types";
+import type { ActivityTypeOption, ActivityTypesData, DraftEntry, DraftsData, Task, TaskFormOptionsData, TimesheetsData } from "@/lib/types";
 import { formatHours, formatWorkedTime } from "@/lib/utils";
 import { Button, EmptyState, InputShell, LoadingState, Modal, Panel } from "@/components/ui";
+import { StopTimerStatusModal } from "@/components/stop-timer-status-modal";
 import { useToast } from "@/components/toast-provider";
 import { TimerModal } from "@/components/timer-modal";
 
 const POLL_INTERVAL_MS = 15 * 1000;
 const NOTIFICATIONS_MUTED_KEY = "timesheet_notifications_muted";
+const EMPTY_TASK_FORM_OPTIONS: TaskFormOptionsData = {
+  projectTypes: [],
+  statuses: [],
+  statusesByProjectType: {},
+  customers: [],
+  projects: [],
+  months: [],
+  reports: []
+};
 
 function toDateTimeLocal(value: string | null | undefined, utcValue?: string | null) {
   return formatDateTimeLocalInput(value, utcValue);
@@ -185,7 +195,10 @@ export function TimesheetScreen() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [showTimerModal, setShowTimerModal] = useState(false);
+  const [showStopTimerModal, setShowStopTimerModal] = useState(false);
   const [stopping, setStopping] = useState(false);
+  const [taskFormOptions, setTaskFormOptions] = useState<TaskFormOptionsData>(EMPTY_TASK_FORM_OPTIONS);
+  const [stopStatusValue, setStopStatusValue] = useState("");
   const [drafts, setDrafts] = useState<DraftEntry[]>([]);
   const [draftsLoading, setDraftsLoading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -509,6 +522,7 @@ export function TimesheetScreen() {
 
   const stopTimer = async () => {
     if (stopping) return;
+    setShowStopTimerModal(false);
     setStopping(true);
     try {
       const response = await fetchAction<{
@@ -539,6 +553,55 @@ export function TimesheetScreen() {
     } finally {
       setStopping(false);
       await Promise.all([load(), loadDrafts()]);
+    }
+  };
+
+  const runningTask = useMemo(() => {
+    const runningTaskId = payload?.runningTimer?.task;
+    if (!runningTaskId) {
+      return null;
+    }
+
+    return tasks.find((task) => task.taskId === runningTaskId) ?? null;
+  }, [payload?.runningTimer?.task, tasks]);
+
+  const stopStatusOptions = useMemo(() => {
+    const projectType = runningTask?.customProjectType || "";
+    const mapped = taskFormOptions.statusesByProjectType[projectType] || [];
+    const source = mapped.length > 0 ? mapped : taskFormOptions.statuses;
+    return [...source].sort((a, b) => a.label.localeCompare(b.label));
+  }, [runningTask?.customProjectType, taskFormOptions]);
+
+  const openStopTimerModal = async () => {
+    try {
+      const response = await fetchAction<TaskFormOptionsData>("task_form_options");
+      setTaskFormOptions(response.data);
+    } catch {
+      setTaskFormOptions(EMPTY_TASK_FORM_OPTIONS);
+    }
+    setStopStatusValue("");
+    setShowStopTimerModal(true);
+  };
+
+  const updateStatusAndStopTimer = async () => {
+    const taskId = payload?.runningTimer?.task;
+    if (!taskId || !stopStatusValue) {
+      await stopTimer();
+      return;
+    }
+
+    try {
+      await fetchAction("update_task_status", {
+        task_id: taskId,
+        status: stopStatusValue
+      }, "POST");
+      await stopTimer();
+    } catch (err) {
+      showToast({
+        title: "Unable to update status",
+        message: err instanceof Error ? err.message : "Please try again.",
+        variant: "error"
+      });
     }
   };
 
@@ -778,7 +841,7 @@ export function TimesheetScreen() {
               {payload.runningTimer ? (
                 <button
                   className="timer-action-button timer-action-button-stop"
-                  onClick={() => void stopTimer()}
+                  onClick={() => void openStopTimerModal()}
                   disabled={stopping}
                 >
                   <Square size={18} />
@@ -962,6 +1025,19 @@ export function TimesheetScreen() {
         activityTypes={activityTypes}
         onClose={() => setShowTimerModal(false)}
         onStart={startTimer}
+      />
+      <StopTimerStatusModal
+        open={showStopTimerModal}
+        taskSubject={payload.runningTimer?.taskSubject || ""}
+        projectName={payload.runningTimer?.projectName || runningTask?.projectName || ""}
+        currentStatus={runningTask?.rawStatus || runningTask?.status || ""}
+        statusValue={stopStatusValue}
+        statusOptions={stopStatusOptions}
+        onStatusChange={setStopStatusValue}
+        onClose={() => setShowStopTimerModal(false)}
+        onSkipAndStop={() => void stopTimer()}
+        onUpdateAndStop={() => void updateStatusAndStopTimer()}
+        submitting={stopping}
       />
       {showManualEntryModal ? (
         <Modal title="Add Manual Timesheet Entry" subtitle="Log missed work without starting a timer" onClose={closeManualEntryModal}>
