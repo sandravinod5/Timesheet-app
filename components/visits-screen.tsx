@@ -999,6 +999,7 @@ export function VisitsScreen() {
                 style={{ animationDelay: `${index * 18}ms` }}
                 onClick={() => {
                   setSelectedDate(day.key);
+                  setShowAddTaskForm(false);
                   setIsDetailsOpen(true);
                 }}
               >
@@ -1103,7 +1104,10 @@ export function VisitsScreen() {
         <Modal
           title={formatDayLabel(selectedDate)}
           subtitle="Tasks planned for this date and current status."
-          onClose={() => setIsDetailsOpen(false)}
+          onClose={() => {
+            setShowAddTaskForm(false);
+            setIsDetailsOpen(false);
+          }}
           size="wide"
         >
           <div className="task-modal-actions">
