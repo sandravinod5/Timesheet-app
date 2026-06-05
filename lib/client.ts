@@ -10,6 +10,8 @@ export async function fetchAction<T>(
   if (method === "GET") {
     url.searchParams.set("action", action);
     Object.entries(params || {}).forEach(([key, value]) => url.searchParams.set(key, value));
+  } else {
+    url.searchParams.set("action", action);
   }
 
   const response = await fetch(url.toString(), {

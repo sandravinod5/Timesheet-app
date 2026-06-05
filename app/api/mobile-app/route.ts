@@ -253,7 +253,66 @@ function filterUserOwnedRunningTimer<T>(entry: T | null | undefined, user: Sessi
   return match ? entry : null;
 }
 
-function filterPayloadForCurrentUser(action: string, payload: Record<string, unknown>, user: SessionUser | null) {
+async function enrichTasksWithCustomStatus(entries: unknown, sid?: string) {
+  if (!Array.isArray(entries) || entries.length === 0) {
+    return entries;
+  }
+
+  const tasks = entries as Array<Record<string, unknown>>;
+  const taskIdsToLoad = Array.from(
+    new Set(
+      tasks
+        .filter((task) => !task.customCustomStatus)
+        .map((task) => (typeof task.taskId === "string" ? task.taskId : ""))
+        .filter(Boolean)
+    )
+  );
+
+  if (taskIdsToLoad.length === 0) {
+    return tasks;
+  }
+
+  const statusByTaskId = new Map<string, string>();
+
+  await Promise.all(
+    taskIdsToLoad.map(async (taskId) => {
+      try {
+        const taskDoc = await fetchErpNextResourceDoc("Task", taskId, sid);
+        const customStatus =
+          typeof taskDoc.custom_custom_status === "string" ? taskDoc.custom_custom_status.trim() : "";
+
+        if (customStatus) {
+          statusByTaskId.set(taskId, customStatus);
+        }
+      } catch {
+        // Keep the original task status if the custom field cannot be loaded.
+      }
+    })
+  );
+
+  if (statusByTaskId.size === 0) {
+    return tasks;
+  }
+
+  return tasks.map((task) => {
+    const taskId = typeof task.taskId === "string" ? task.taskId : "";
+    const customStatus = taskId ? statusByTaskId.get(taskId) : "";
+
+    return customStatus
+      ? {
+          ...task,
+          customCustomStatus: customStatus
+        }
+      : task;
+  });
+}
+
+async function filterPayloadForCurrentUser(
+  action: string,
+  payload: Record<string, unknown>,
+  user: SessionUser | null,
+  sid?: string
+) {
   if (!user) {
     return payload;
   }
@@ -289,6 +348,14 @@ function filterPayloadForCurrentUser(action: string, payload: Record<string, unk
     }
   }
 
+  if (action === "tasks" && Array.isArray(nextData.tasks)) {
+    nextData.tasks = await enrichTasksWithCustomStatus(nextData.tasks, sid);
+  }
+
+  if (action === "overview" && Array.isArray(nextData.recentTasks)) {
+    nextData.recentTasks = await enrichTasksWithCustomStatus(nextData.recentTasks, sid);
+  }
+
   return {
     ...payload,
     data: nextData
@@ -296,14 +363,34 @@ function filterPayloadForCurrentUser(action: string, payload: Record<string, unk
 }
 
 async function getRequestParams(request: NextRequest) {
+  const urlParams = Object.fromEntries(request.nextUrl.searchParams.entries());
+
   if (request.method === "GET") {
-    return Object.fromEntries(request.nextUrl.searchParams.entries());
+    return urlParams;
   }
 
   try {
-    return (await request.json()) as Record<string, string>;
+    const rawBody = await request.text();
+    if (!rawBody.trim()) {
+      return urlParams;
+    }
+
+    try {
+      const parsed = JSON.parse(rawBody) as Record<string, unknown>;
+      return {
+        ...urlParams,
+        ...Object.fromEntries(
+          Object.entries(parsed).map(([key, value]) => [key, typeof value === "string" ? value : String(value ?? "")])
+        )
+      };
+    } catch {
+      return {
+        ...urlParams,
+        ...Object.fromEntries(new URLSearchParams(rawBody).entries())
+      };
+    }
   } catch {
-    return {};
+    return urlParams;
   }
 }
 
@@ -360,7 +447,7 @@ async function getTaskFormOptionsDirect(sid?: string) {
       sid
     }),
     fetchErpNextResourceList("Customer", {
-      fields: ["name", "customer_name"],
+      fields: ["name", "customer_name", "custom_short_name"],
       orderBy: "customer_name asc",
       sid
     }),
@@ -477,7 +564,19 @@ async function getTaskFormOptionsDirect(sid?: string) {
     projectTypes,
     statuses: uniqByValue(statusMasterRows.map((row) => toOption(row, "name", ["name"]))),
     statusesByProjectType,
-    customers: uniqByValue(customerRows.map((row) => toOption(row, "name", ["customer_name", "name"]))),
+    customers: uniqByValue(
+      customerRows.map((row) => {
+        const option = toOption(row, "name", ["customer_name", "name"]);
+        if (!option) {
+          return null;
+        }
+
+        return {
+          ...option,
+          shortName: typeof row.custom_short_name === "string" ? row.custom_short_name.trim() : ""
+        };
+      })
+    ).sort((a, b) => a.label.localeCompare(b.label)),
     projects: uniqByValue(projectRows.map((row) => toOption(row, "name", ["project_name", "name"]))),
     months,
     reports
@@ -581,7 +680,7 @@ async function handleRequest(request: NextRequest) {
 
     const payload = await callErpNextMobileApp(action, params, sid);
     const normalizedPayload = attachUtcDateTimes(normalizeKeys(payload)) as Record<string, unknown>;
-    const filteredPayload = filterPayloadForCurrentUser(action, normalizedPayload, currentUser);
+    const filteredPayload = await filterPayloadForCurrentUser(action, normalizedPayload, currentUser, sid);
 
     return NextResponse.json(filteredPayload, {
       status: payload.success ? 200 : 400

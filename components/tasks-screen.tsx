@@ -3,17 +3,34 @@
 import { Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { fetchAction } from "@/lib/client";
-import type { Task, TasksData } from "@/lib/types";
+import { useToast } from "@/components/toast-provider";
+import type { Task, TaskFormOptionsData, TasksData } from "@/lib/types";
 import { statusBadgeClass } from "@/lib/utils";
-import { EmptyState, InputShell, LoadingState, Panel } from "@/components/ui";
+import { Button, EmptyState, InputShell, LoadingState, Modal, Panel } from "@/components/ui";
+
+const EMPTY_TASK_FORM_OPTIONS: TaskFormOptionsData = {
+  projectTypes: [],
+  statuses: [],
+  statusesByProjectType: {},
+  customers: [],
+  projects: [],
+  months: [],
+  reports: []
+};
 
 export function TasksScreen() {
+  const { showToast } = useToast();
   const [payload, setPayload] = useState<TasksData | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [customer, setCustomer] = useState("all");
   const [project, setProject] = useState("all");
+  const [taskFormOptions, setTaskFormOptions] = useState<TaskFormOptionsData>(EMPTY_TASK_FORM_OPTIONS);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [selectedStatusValue, setSelectedStatusValue] = useState("");
+  const [statusModalLoading, setStatusModalLoading] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
 
   useEffect(() => {
     void (async () => {
@@ -30,7 +47,9 @@ export function TasksScreen() {
     }
 
     return payload.tasks.filter((task) => {
-      if (status !== "all" && task.status !== status) {
+      const cardStatus = task.customCustomStatus || task.status;
+
+      if (status !== "all" && cardStatus !== status) {
         return false;
       }
 
@@ -53,6 +72,105 @@ export function TasksScreen() {
         .includes(search.toLowerCase());
     });
   }, [payload?.tasks, search, status, customer, project]);
+
+  const selectedTask = useMemo(
+    () => payload?.tasks.find((task) => task.taskId === selectedTaskId) ?? null,
+    [payload?.tasks, selectedTaskId]
+  );
+
+  const selectedTaskStatus = selectedTask?.customCustomStatus || selectedTask?.status || "";
+  const selectedTaskStatusOptions = useMemo(() => {
+    if (!selectedTask) {
+      return [];
+    }
+
+    const mapped = taskFormOptions.statusesByProjectType[selectedTask.customProjectType || ""] || [];
+    const source = mapped.length > 0 ? mapped : taskFormOptions.statuses;
+
+    return [...source].sort((a, b) => a.label.localeCompare(b.label));
+  }, [selectedTask, taskFormOptions]);
+
+  const openStatusModal = async (task: Task) => {
+    setSelectedTaskId(task.taskId);
+    setSelectedStatusValue(task.customCustomStatus || task.status || "");
+    setStatusModalLoading(true);
+
+    try {
+      const response = await fetchAction<TaskFormOptionsData>("task_form_options");
+      setTaskFormOptions(response.data);
+    } catch (err) {
+      setTaskFormOptions(EMPTY_TASK_FORM_OPTIONS);
+      showToast({
+        title: "Status options unavailable",
+        message: err instanceof Error ? err.message : "Please try again.",
+        variant: "error"
+      });
+    } finally {
+      setStatusModalLoading(false);
+    }
+  };
+
+  const closeStatusModal = () => {
+    if (updatingStatus) {
+      return;
+    }
+
+    setSelectedTaskId(null);
+    setSelectedStatusValue("");
+  };
+
+  const updateTaskStatus = async () => {
+    if (!selectedTask || !selectedStatusValue) {
+      return;
+    }
+
+    setUpdatingStatus(true);
+
+    try {
+      await fetchAction(
+        "update_task_status",
+        {
+          task_id: selectedTask.taskId,
+          status: selectedStatusValue
+        },
+        "POST"
+      );
+
+      setPayload((current) => {
+        if (!current) {
+          return current;
+        }
+
+        return {
+          ...current,
+          tasks: current.tasks.map((task) =>
+            task.taskId === selectedTask.taskId
+              ? {
+                  ...task,
+                  status: selectedStatusValue,
+                  customCustomStatus: selectedStatusValue
+                }
+              : task
+          )
+        };
+      });
+
+      showToast({
+        title: "Task status updated",
+        message: `${selectedTask.subject} is now ${selectedStatusValue}.`,
+        variant: "success"
+      });
+      closeStatusModal();
+    } catch (err) {
+      showToast({
+        title: "Unable to update task status",
+        message: err instanceof Error ? err.message : "Please try again.",
+        variant: "error"
+      });
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
 
   if (loading) {
     return <LoadingState label="Loading tasks..." />;
@@ -106,7 +224,7 @@ export function TasksScreen() {
           <InputShell className="filter-select-shell">
             <select value={status} onChange={(event) => setStatus(event.target.value)}>
               <option value="all">All statuses</option>
-              {[...new Set(payload.tasks.map((task) => task.status))].map((value) => (
+              {[...new Set(payload.tasks.map((task) => task.customCustomStatus || task.status).filter(Boolean))].map((value) => (
                 <option key={value} value={value}>
                   {value}
                 </option>
@@ -148,30 +266,99 @@ export function TasksScreen() {
           <EmptyState title="No tasks found" copy="Try changing the status filter or search text." />
         ) : (
           <div className="list-stack">
-            {filteredTasks.map((task: Task) => (
-              <article key={task.taskId} className="list-card">
-                <div className="list-head">
-                  <div className="list-head-copy">
-                    <h3 className="list-title">{task.subject}</h3>
-                    <p className="panel-subtitle">{task.customerName || "No customer"}</p>
+            {filteredTasks.map((task: Task) => {
+              const cardStatus = task.customCustomStatus || task.status;
+
+              return (
+                <article
+                  key={task.taskId}
+                  className="list-card"
+                  onClick={() => void openStatusModal(task)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      void openStatusModal(task);
+                    }
+                  }}
+                >
+                  <div className="list-head">
+                    <div className="list-head-copy">
+                      <h3 className="list-title">{task.subject}</h3>
+                      <p className="panel-subtitle">{task.customerName || "No customer"}</p>
+                    </div>
+                    <span className={`badge ${statusBadgeClass(cardStatus, task.isOverdue)}`}>{cardStatus}</span>
                   </div>
-                  <span className={`badge ${statusBadgeClass(task.status, task.isOverdue)}`}>{task.status}</span>
-                </div>
 
-                <p className="list-description task-supporting-copy">
-                  Project: {task.projectName || "No project"} | Owner: {task.ownerName || "Not set"}
-                </p>
+                  <p className="list-description task-supporting-copy">
+                    Project: {task.projectName || "No project"} | Owner: {task.ownerName || "Not set"}
+                  </p>
 
-                <div className="list-meta muted-row list-meta-wrap meta-row-spaced">
-                  <span>ID {task.taskId}</span>
-                  <span>Due {task.expEndDate || "-"}</span>
-                  <span>{task.customProjectType || "General"}</span>
-                </div>
-              </article>
-            ))}
+                  <div className="list-meta muted-row list-meta-wrap meta-row-spaced">
+                    <span>ID {task.taskId}</span>
+                    <span>Due {task.expEndDate || "-"}</span>
+                    <span>{cardStatus || "-"}</span>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         )}
       </Panel>
+
+      {selectedTask ? (
+        <Modal
+          title="Update Task Status"
+          subtitle="Change the current custom status for this task."
+          onClose={closeStatusModal}
+        >
+          <div className="draft-edit-form">
+            <div className="draft-edit-row draft-edit-row--full">
+              <label className="report-date-label">Task</label>
+              <p className="panel-title">{selectedTask.subject}</p>
+            </div>
+            <div className="draft-edit-row draft-edit-row--full">
+              <label className="report-date-label">Current Status</label>
+              <p className="panel-subtitle">{selectedTaskStatus || "No current status"}</p>
+            </div>
+            <div className="draft-edit-row draft-edit-row--full">
+              <label className="report-date-label">Update Status</label>
+              {statusModalLoading ? (
+                <p className="panel-subtitle">Loading status options...</p>
+              ) : (
+                <label className="input-shell">
+                  <select
+                    value={selectedStatusValue}
+                    onChange={(event) => setSelectedStatusValue(event.target.value)}
+                    aria-label="Update task custom status"
+                    disabled={updatingStatus}
+                  >
+                    <option value="">Select status</option>
+                    {selectedTaskStatusOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+            </div>
+            <div className="button-row button-row-end">
+              <Button type="button" variant="secondary" onClick={closeStatusModal} disabled={updatingStatus}>
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={() => void updateTaskStatus()}
+                disabled={statusModalLoading || updatingStatus || !selectedStatusValue}
+              >
+                {updatingStatus ? "Updating..." : "Update Status"}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      ) : null}
     </div>
   );
 }

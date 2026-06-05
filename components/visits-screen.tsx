@@ -249,21 +249,29 @@ function formatDateShortLabel(value: string) {
 
 function buildGeneratedTaskSubject({
   project,
-  customer,
+  customerShortName,
   report,
-  startDate
+  month
 }: {
   project: string;
-  customer: string;
+  customerShortName: string;
   report: string;
-  startDate: string;
+  month: string;
 }) {
-  const parts = [project, customer, report].map((value) => value.trim()).filter(Boolean);
-  if (parts.length > 0) {
-    return `${parts.join(" - ")} - ${startDate}`;
-  }
+  const trimmedCustomerShortName = customerShortName.trim();
+  const parts = trimmedCustomerShortName
+    ? [project, trimmedCustomerShortName, report, month]
+    : [project, report, month];
 
-  return `Task - ${startDate}`;
+  const subject = parts
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .join(" - ")
+    .replace(/STGY\s*-\s*/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return subject || "Task";
 }
 
 function isVisitProjectType(value?: string | null) {
@@ -463,6 +471,8 @@ export function VisitsScreen() {
   const [newTaskMonth, setNewTaskMonth] = useState("");
   const [newTaskReport, setNewTaskReport] = useState("");
   const [newTaskCustomStatus, setNewTaskCustomStatus] = useState("");
+  const [newTaskName, setNewTaskName] = useState("");
+  const [hasEditedTaskName, setHasEditedTaskName] = useState(false);
   const [newTaskStartDate, setNewTaskStartDate] = useState(dateKey(new Date()));
   const [newTaskCompletionDate, setNewTaskCompletionDate] = useState(dateKey(new Date()));
   const [addingTask, setAddingTask] = useState(false);
@@ -765,6 +775,22 @@ export function VisitsScreen() {
     return [...source].sort((a, b) => a.label.localeCompare(b.label));
   }, [newTaskProjectType, taskFormOptions]);
 
+  const selectedCustomerOption = useMemo(
+    () => taskFormOptions.customers.find((option) => option.value === newTaskCustomer) ?? null,
+    [newTaskCustomer, taskFormOptions.customers]
+  );
+
+  const generatedTaskName = useMemo(
+    () =>
+      buildGeneratedTaskSubject({
+        project: newTaskProject,
+        customerShortName: selectedCustomerOption?.shortName || "",
+        report: newTaskReport,
+        month: newTaskMonth
+      }),
+    [newTaskMonth, newTaskProject, newTaskReport, selectedCustomerOption]
+  );
+
   useEffect(() => {
     setNewTaskCustomStatus((current) => {
       if (availableStatusOptions.some((option) => option.value === current)) {
@@ -775,17 +801,18 @@ export function VisitsScreen() {
     });
   }, [availableStatusOptions]);
 
+  useEffect(() => {
+    if (!hasEditedTaskName) {
+      setNewTaskName(generatedTaskName);
+    }
+  }, [generatedTaskName, hasEditedTaskName]);
+
   const handleCreateTaskForDate = async () => {
     if (addingTask || !newTaskStartDate || !newTaskCompletionDate) {
       return;
     }
 
-    const subject = buildGeneratedTaskSubject({
-      project: newTaskProject,
-      customer: newTaskCustomer,
-      report: newTaskReport,
-      startDate: newTaskStartDate
-    });
+    const subject = newTaskName.trim() || generatedTaskName;
 
     setAddingTask(true);
     setAddTaskError(null);
@@ -809,6 +836,8 @@ export function VisitsScreen() {
       setNewTaskMonth("");
       setNewTaskReport("");
       setNewTaskCustomStatus("");
+      setNewTaskName("");
+      setHasEditedTaskName(false);
       setNewTaskStartDate(selectedDate);
       setNewTaskCompletionDate(selectedDate);
       setShowAddTaskForm(false);
@@ -1080,7 +1109,7 @@ export function VisitsScreen() {
                         <h4 className="list-title">{task.customerName || "No customer"}</h4>
                         <p className="panel-subtitle">{task.subject}</p>
                       </div>
-                      <span className={`badge ${statusBadgeClass(task.status, task.isOverdue)}`}>{task.status}</span>
+                      <span className={`badge ${statusBadgeClass(task.customCustomStatus || task.status, task.isOverdue)}`}>{task.customCustomStatus || task.status}</span>
                     </div>
                     <div className="visit-meta-row">
                       <span>{formatDateShortLabel(date)}</span>
@@ -1129,7 +1158,7 @@ export function VisitsScreen() {
           {showAddTaskForm ? (
             <div className="task-create-form">
               <SearchableSelectField
-                label="Custom Project Type"
+                label="Project Type"
                 ariaLabel="Project type"
                 placeholder="Search project type"
                 value={newTaskProjectType}
@@ -1146,7 +1175,7 @@ export function VisitsScreen() {
               />
               <SearchableSelectField
                 className="task-create-field--full"
-                label="Custom Customer"
+                label="Customer"
                 ariaLabel="Customer"
                 placeholder="Search customer"
                 value={newTaskCustomer}
@@ -1154,16 +1183,16 @@ export function VisitsScreen() {
                 onChange={setNewTaskCustomer}
               />
               <SearchableSelectField
-                label="Custom Month"
-                ariaLabel="Custom month"
+                label="Period"
+                ariaLabel="Period"
                 placeholder="Search period"
                 value={newTaskMonth}
                 options={taskFormOptions.months}
                 onChange={setNewTaskMonth}
               />
               <SearchableSelectField
-                label="Custom Reports"
-                ariaLabel="Custom report"
+                label="Task Type"
+                ariaLabel="Task type"
                 placeholder="Search task type"
                 value={newTaskReport}
                 options={taskFormOptions.reports}
@@ -1192,13 +1221,27 @@ export function VisitsScreen() {
               </div>
               <SearchableSelectField
                 className="task-create-field--full"
-                label="Custom Status"
-                ariaLabel="Custom status"
+                label="Status"
+                ariaLabel="Status"
                 placeholder={newTaskProjectType ? "Search status" : "Select project type first"}
                 value={newTaskCustomStatus}
                 options={availableStatusOptions}
                 onChange={setNewTaskCustomStatus}
               />
+              <div className="task-create-field task-create-field--full">
+                <label className="report-date-label">Task Name</label>
+                <input
+                  type="text"
+                  className="report-date-input"
+                  value={newTaskName}
+                  onChange={(event) => {
+                    setNewTaskName(event.target.value);
+                    setHasEditedTaskName(true);
+                  }}
+                  aria-label="Task name"
+                  placeholder="Task name"
+                />
+              </div>
               <div className="task-create-submit">
               <button
                 type="button"
@@ -1216,22 +1259,27 @@ export function VisitsScreen() {
             <EmptyState title="No tasks on this date" copy="Choose another day to see tasks." />
           ) : (
             <div className="list-stack">
-              {selectedTasks.map((task) => (
-                <article key={task.taskId} className="list-card">
-                  <div className="list-head">
-                    <div className="list-head-copy">
-                      <h4 className="list-title">{task.subject}</h4>
-                      <p className="panel-subtitle">{task.customerName || "No customer"}</p>
+              {selectedTasks.map((task) => {
+                const cardStatus = task.customCustomStatus || "-";
+                const badgeStatusKey = task.customCustomStatus || task.status;
+
+                return (
+                  <article key={task.taskId} className="list-card">
+                    <div className="list-head">
+                      <div className="list-head-copy">
+                        <h4 className="list-title">{task.subject}</h4>
+                        <p className="panel-subtitle">{task.customerName || "No customer"}</p>
+                      </div>
+                      <span className={`badge ${statusBadgeClass(badgeStatusKey, task.isOverdue)}`}>{cardStatus}</span>
                     </div>
-                    <span className={`badge ${statusBadgeClass(task.status, task.isOverdue)}`}>{task.status}</span>
-                  </div>
-                  <div className="visit-meta-row">
-                    <span>{task.projectName || "No project"}</span>
-                    <span>{task.ownerName || "No owner"}</span>
-                    <span>{task.taskId}</span>
-                  </div>
-                </article>
-              ))}
+                    <div className="visit-meta-row">
+                      <span>{task.projectName || "No project"}</span>
+                      <span>{task.ownerName || "No owner"}</span>
+                      <span>{cardStatus}</span>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           )}
         </Modal>

@@ -42,6 +42,7 @@ export type Task = {
   taskId: string;
   subject: string;
   status: string;
+  customCustomStatus?: string | null;
   rawStatus?: string | null;
   customerId?: string | null;
   customerName?: string | null;
@@ -139,6 +140,7 @@ export type ActivityTypeOption = {
 export type SelectOption = {
   value: string;
   label: string;
+  shortName?: string | null;
 };
 
 export type TaskFormOptionsData = {
