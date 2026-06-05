@@ -328,6 +328,37 @@ function isVisitTask(task: Task) {
   return isVisitProjectType(task.customProjectType);
 }
 
+function getVisitStatusText(task: Task) {
+  return String(task.customCustomStatus || task.rawStatus || task.status || "").trim();
+}
+
+function getVisitKindForTask(task: Task): VisitItem["kind"] {
+  const normalized = getVisitStatusText(task).toLowerCase();
+
+  if (
+    normalized.includes("running") ||
+    normalized.includes("working") ||
+    normalized.includes("progress") ||
+    normalized.includes("execution") ||
+    normalized.includes("review")
+  ) {
+    return "running";
+  }
+
+  if (
+    normalized.includes("visit completed") ||
+    normalized.includes("visited") ||
+    normalized.includes("completed") ||
+    normalized.includes("shared") ||
+    normalized.includes("done") ||
+    normalized.includes("closed")
+  ) {
+    return "completed";
+  }
+
+  return "scheduled";
+}
+
 function buildCalendarDays(monthCursor: Date) {
   const first = firstOfMonth(monthCursor);
   const last = endOfMonth(monthCursor);
@@ -662,26 +693,23 @@ export function VisitsScreen() {
         continue;
       }
 
-      if (["Completed", "Closed"].includes(task.status)) {
-        continue;
-      }
-
       const recordedKey = `${task.taskId}|${scheduledDate}`;
       if (completedTaskDates.has(recordedKey) || runningTaskDates.has(recordedKey)) {
         continue;
       }
 
-      const isScheduledStatus = String(task.rawStatus || "").toLowerCase() === "scheduled";
+      const visitKind = getVisitKindForTask(task);
+      const visitStatus = getVisitStatusText(task) || (visitKind === "completed" ? "Visited" : visitKind === "running" ? "Running" : "Scheduled");
       const item: VisitItem = {
-        key: `scheduled-${task.taskId}-${scheduledDate}`,
-        kind: "scheduled",
+        key: `${visitKind}-${task.taskId}-${scheduledDate}`,
+        kind: visitKind,
         date: scheduledDate,
         taskId: task.taskId,
         subject: task.subject,
         customerName: task.customerName || "No customer",
         projectName: task.projectName || "No project",
-        rawStatus: task.rawStatus,
-        displayStatus: isScheduledStatus ? "Scheduled" : task.status,
+        rawStatus: visitStatus,
+        displayStatus: visitStatus
       };
 
       addVisit(byDate, item);
