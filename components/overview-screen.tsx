@@ -23,7 +23,8 @@ import { useToast } from "@/components/toast-provider";
 import { TimerModal } from "@/components/timer-modal";
 
 const STANDARD_HOURS_PER_DAY = 7;
-const POLL_INTERVAL_MS = 15 * 1000;
+const ACTIVE_POLL_INTERVAL_MS = 15 * 1000;
+const IDLE_POLL_INTERVAL_MS = 60 * 1000;
 const EMPTY_TASK_FORM_OPTIONS: TaskFormOptionsData = {
   projectTypes: [],
   statuses: [],
@@ -158,7 +159,7 @@ export function OverviewScreen() {
       if (document.visibilityState === "visible") {
         void load({ silent: true });
       }
-    }, POLL_INTERVAL_MS);
+    }, data?.runningTimer ? ACTIVE_POLL_INTERVAL_MS : IDLE_POLL_INTERVAL_MS);
 
     const onVisibilityChange = () => {
       if (document.visibilityState === "visible") {
@@ -174,7 +175,7 @@ export function OverviewScreen() {
       window.removeEventListener("focus", onVisibilityChange);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, []);
+  }, [data?.runningTimer]);
 
   useEffect(() => {
     if (!data?.runningTimer?.fromTime) {
@@ -824,7 +825,7 @@ export function OverviewScreen() {
         open={showStopTimerModal}
         taskSubject={data.runningTimer?.taskSubject || ""}
         projectName={data.runningTimer?.projectName || runningTask?.projectName || ""}
-        currentStatus={runningTask?.rawStatus || runningTask?.status || ""}
+        currentStatus={runningTask?.customCustomStatus || runningTask?.rawStatus || runningTask?.status || ""}
         statusValue={stopStatusValue}
         statusOptions={stopStatusOptions}
         onStatusChange={setStopStatusValue}

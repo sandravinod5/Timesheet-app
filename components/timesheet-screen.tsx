@@ -12,7 +12,8 @@ import { StopTimerStatusModal } from "@/components/stop-timer-status-modal";
 import { useToast } from "@/components/toast-provider";
 import { TimerModal } from "@/components/timer-modal";
 
-const POLL_INTERVAL_MS = 15 * 1000;
+const ACTIVE_POLL_INTERVAL_MS = 15 * 1000;
+const IDLE_POLL_INTERVAL_MS = 60 * 1000;
 const NOTIFICATIONS_MUTED_KEY = "timesheet_notifications_muted";
 const EMPTY_TASK_FORM_OPTIONS: TaskFormOptionsData = {
   projectTypes: [],
@@ -307,7 +308,10 @@ export function TimesheetScreen() {
       }
     };
 
-    const interval = window.setInterval(refresh, POLL_INTERVAL_MS);
+    const interval = window.setInterval(
+      refresh,
+      payload?.runningTimer ? ACTIVE_POLL_INTERVAL_MS : IDLE_POLL_INTERVAL_MS
+    );
     window.addEventListener("focus", refresh);
     document.addEventListener("visibilitychange", refresh);
 
@@ -316,7 +320,7 @@ export function TimesheetScreen() {
       window.removeEventListener("focus", refresh);
       document.removeEventListener("visibilitychange", refresh);
     };
-  }, []);
+  }, [payload?.runningTimer]);
 
   useEffect(() => {
     const maybeNotify = async () => {
@@ -1030,7 +1034,7 @@ export function TimesheetScreen() {
         open={showStopTimerModal}
         taskSubject={payload.runningTimer?.taskSubject || ""}
         projectName={payload.runningTimer?.projectName || runningTask?.projectName || ""}
-        currentStatus={runningTask?.rawStatus || runningTask?.status || ""}
+        currentStatus={runningTask?.customCustomStatus || runningTask?.rawStatus || runningTask?.status || ""}
         statusValue={stopStatusValue}
         statusOptions={stopStatusOptions}
         onStatusChange={setStopStatusValue}

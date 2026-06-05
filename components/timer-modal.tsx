@@ -25,6 +25,7 @@ export function TimerModal({
   const [selectedActivityType, setSelectedActivityType] = useState<string | null>(null);
   const [activitySearch, setActivitySearch] = useState("");
   const [notes, setNotes] = useState("");
+  const [starting, setStarting] = useState(false);
 
   const filteredTasks = useMemo(() => {
     const normalized = search.trim().toLowerCase();
@@ -46,6 +47,9 @@ export function TimerModal({
   }, [search, tasks]);
 
   const handleClose = () => {
+    if (starting) {
+      return;
+    }
     setSelectedTask(null);
     setSelectedParentGroup(null);
     setSelectedActivityType(null);
@@ -129,9 +133,15 @@ export function TimerModal({
           type="button"
           className="timer-action-button timer-action-button-start"
           style={{ width: "100%" }}
-          onClick={() => void onStart(selectedTask, selectedActivityType, notes)}
+          disabled={starting}
+          onClick={() => {
+            setStarting(true);
+            void onStart(selectedTask, selectedActivityType, notes).finally(() => {
+              setStarting(false);
+            });
+          }}
         >
-          Start Timer
+          {starting ? "Starting..." : "Start Timer"}
         </button>
       </Modal>
     );

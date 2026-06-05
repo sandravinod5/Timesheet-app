@@ -274,6 +274,29 @@ function buildGeneratedTaskSubject({
   return subject || "Task";
 }
 
+function mapCustomStatusToTaskStatus(value?: string | null) {
+  const raw = typeof value === "string" ? value.trim() : "";
+  if (!raw) {
+    return "Open";
+  }
+
+  const normalized = raw.toLowerCase();
+  if (normalized === "open") return "Open";
+  if (normalized === "working") return "Working";
+  if (normalized === "pending review") return "Pending Review";
+  if (normalized === "overdue") return "Overdue";
+  if (normalized === "template") return "Template";
+  if (normalized === "completed") return "Completed";
+  if (normalized === "cancelled" || normalized === "canceled") return "Cancelled";
+  if (normalized.includes("cancel")) return "Cancelled";
+  if (normalized.includes("complete") || normalized.includes("closed") || normalized.includes("done") || normalized.includes("shared")) return "Completed";
+  if (normalized.includes("review")) return "Pending Review";
+  if (normalized.includes("working") || normalized.includes("progress") || normalized.includes("execution") || normalized.includes("revising")) return "Working";
+  if (normalized.includes("overdue")) return "Overdue";
+  if (normalized.includes("template")) return "Template";
+  return "Open";
+}
+
 function isVisitProjectType(value?: string | null) {
   const normalized = String(value || "").trim().toLowerCase();
   if (!normalized) {
@@ -826,7 +849,7 @@ export function VisitsScreen() {
         custom_month: newTaskMonth,
         custom_reports: newTaskReport,
         custom_custom_status: newTaskCustomStatus,
-        status: newTaskCustomStatus,
+        status: mapCustomStatusToTaskStatus(newTaskCustomStatus),
         exp_start_date: newTaskStartDate,
         completion_date: newTaskCompletionDate
       }, "POST");

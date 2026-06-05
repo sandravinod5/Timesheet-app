@@ -414,6 +414,60 @@ function formatErrorMessage(error: unknown) {
   return "ERPNext request could not be completed.";
 }
 
+function mapCustomStatusToTaskStatus(value?: string | null) {
+  const raw = typeof value === "string" ? value.trim() : "";
+  if (!raw) {
+    return "Open";
+  }
+
+  const normalized = raw.toLowerCase();
+  const directMap: Record<string, string> = {
+    open: "Open",
+    working: "Working",
+    "pending review": "Pending Review",
+    overdue: "Overdue",
+    template: "Template",
+    completed: "Completed",
+    cancelled: "Cancelled",
+    canceled: "Cancelled"
+  };
+
+  if (directMap[normalized]) {
+    return directMap[normalized];
+  }
+
+  if (normalized.includes("cancel")) {
+    return "Cancelled";
+  }
+  if (
+    normalized.includes("complete") ||
+    normalized.includes("closed") ||
+    normalized.includes("done") ||
+    normalized.includes("shared")
+  ) {
+    return "Completed";
+  }
+  if (normalized.includes("review")) {
+    return "Pending Review";
+  }
+  if (
+    normalized.includes("working") ||
+    normalized.includes("progress") ||
+    normalized.includes("execution") ||
+    normalized.includes("revising")
+  ) {
+    return "Working";
+  }
+  if (normalized.includes("overdue")) {
+    return "Overdue";
+  }
+  if (normalized.includes("template")) {
+    return "Template";
+  }
+
+  return "Open";
+}
+
 function toOption(
   row: Record<string, unknown>,
   valueKey: string,
@@ -643,9 +697,9 @@ async function handleRequest(request: NextRequest) {
 
     if (action === "update_task_status") {
       const taskId = params.task_id || params.taskId;
-      const status = params.status;
+      const customStatus = params.status;
 
-      if (!taskId || !status) {
+      if (!taskId || !customStatus) {
         return NextResponse.json(
           {
             success: false,
@@ -661,8 +715,8 @@ async function handleRequest(request: NextRequest) {
         "Task",
         taskId,
         {
-          status,
-          custom_custom_status: status
+          status: mapCustomStatusToTaskStatus(customStatus),
+          custom_custom_status: customStatus
         },
         sid
       );
@@ -675,6 +729,22 @@ async function handleRequest(request: NextRequest) {
           task: updated
         },
         error: null
+      });
+    }
+
+    if (action === "create_task") {
+      const customStatus = params.custom_custom_status || params.status;
+      const normalizedParams = {
+        ...params,
+        status: mapCustomStatusToTaskStatus(customStatus),
+        custom_custom_status: customStatus || ""
+      };
+
+      const payload = await callErpNextMobileApp(action, normalizedParams, sid);
+      const normalizedPayload = attachUtcDateTimes(normalizeKeys(payload)) as Record<string, unknown>;
+
+      return NextResponse.json(normalizedPayload, {
+        status: payload.success ? 200 : 400
       });
     }
 
