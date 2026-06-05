@@ -34,7 +34,14 @@ type VisitItem = {
   hours?: number;
 };
 
-const VISIT_PROJECT_TYPES = ["client visit strategy", "partners client visit strategy"];
+const VISIT_PROJECT_TYPES = [
+  "client visit strategy",
+  "partners client visit strategy",
+  "client visit stgy",
+  "partners client visit stgy",
+  "visit strategy",
+  "visit stgy"
+];
 const WEEK_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const EMPTY_TASK_FORM_OPTIONS: TaskFormOptionsData = {
   projectTypes: [],
@@ -298,12 +305,19 @@ function mapCustomStatusToTaskStatus(value?: string | null) {
 }
 
 function isVisitProjectType(value?: string | null) {
-  const normalized = String(value || "").trim().toLowerCase();
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
   if (!normalized) {
     return false;
   }
 
-  return VISIT_PROJECT_TYPES.some((item) => normalized.includes(item));
+  if (VISIT_PROJECT_TYPES.some((item) => normalized.includes(item))) {
+    return true;
+  }
+
+  return normalized.includes("visit") && (normalized.includes("strategy") || normalized.includes("stgy"));
 }
 
 function isVisitText(value?: string | null) {
