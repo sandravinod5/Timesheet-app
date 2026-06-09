@@ -11,7 +11,7 @@ import {
   Target,
   TrendingUp
 } from "lucide-react";
-import { fetchAction } from "@/lib/client";
+import { fetchAction, fetchActionCached } from "@/lib/client";
 import { formatLocalTime, getElapsedSeconds, parseApiDateTime } from "@/lib/datetime";
 import { showSystemNotification } from "@/lib/notifications";
 import type { ActivityTypeOption, ActivityTypesData, OverviewData, Task, TaskFormOptionsData, TimesheetsData } from "@/lib/types";
@@ -23,8 +23,10 @@ import { useToast } from "@/components/toast-provider";
 import { TimerModal } from "@/components/timer-modal";
 
 const STANDARD_HOURS_PER_DAY = 7;
-const ACTIVE_POLL_INTERVAL_MS = 15 * 1000;
-const IDLE_POLL_INTERVAL_MS = 60 * 1000;
+const ACTIVE_POLL_INTERVAL_MS = 30 * 1000;
+const IDLE_POLL_INTERVAL_MS = 120 * 1000;
+// Random per-client jitter so many clients don't poll in lockstep (thundering herd).
+const POLL_JITTER_MS = 5 * 1000;
 const EMPTY_TASK_FORM_OPTIONS: TaskFormOptionsData = {
   projectTypes: [],
   statuses: [],
@@ -104,7 +106,7 @@ export function OverviewScreen() {
       fetchAction<OverviewData>("overview"),
       fetchAction<{ tasks: Task[] }>("tasks"),
       fetchAction<TimesheetsData>("timesheets"),
-      fetchAction<ActivityTypesData>("activity_types")
+      fetchActionCached<ActivityTypesData>("activity_types")
     ]);
 
     if (overviewResult.status === "fulfilled") {
@@ -150,16 +152,38 @@ export function OverviewScreen() {
     }
   };
 
+  // Lightweight background poll: fetches ONLY the overview action, which already
+  // carries the running timer, recent tasks, KPIs and month summary. This avoids
+  // re-running the heavy tasks + timesheets queries on every cycle. The fuller
+  // tasks/timesheets/activity lists are refreshed by load() on mount, manual
+  // refresh, window focus, and after start/stop timer mutations.
+  const lightPoll = async () => {
+    setSyncing(true);
+    try {
+      const response = await fetchAction<OverviewData>("overview");
+      setData(response.data);
+      setLastSyncedAt(new Date());
+      setError(null);
+    } catch {
+      // Swallow transient poll failures and keep the last good data on screen;
+      // the next poll, focus, or manual refresh will surface any real error.
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   useEffect(() => {
     void load();
   }, []);
 
   useEffect(() => {
+    const base = data?.runningTimer ? ACTIVE_POLL_INTERVAL_MS : IDLE_POLL_INTERVAL_MS;
+    const period = base + Math.floor(Math.random() * POLL_JITTER_MS);
     const interval = window.setInterval(() => {
       if (document.visibilityState === "visible") {
-        void load({ silent: true });
+        void lightPoll();
       }
-    }, data?.runningTimer ? ACTIVE_POLL_INTERVAL_MS : IDLE_POLL_INTERVAL_MS);
+    }, period);
 
     const onVisibilityChange = () => {
       if (document.visibilityState === "visible") {
@@ -413,7 +437,7 @@ export function OverviewScreen() {
 
   const openStopTimerModal = async () => {
     try {
-      const response = await fetchAction<TaskFormOptionsData>("task_form_options");
+      const response = await fetchActionCached<TaskFormOptionsData>("task_form_options");
       setTaskFormOptions(response.data);
     } catch {
       setTaskFormOptions(EMPTY_TASK_FORM_OPTIONS);

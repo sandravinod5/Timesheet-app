@@ -8,13 +8,17 @@ import {
   Clock3,
   MapPinned,
   Plus,
+  Square,
   Sparkles
 } from "lucide-react";
-import { fetchAction } from "@/lib/client";
+import { fetchAction, fetchActionCached } from "@/lib/client";
 import { formatLocalDate, formatLocalTime, getDateKeyFromDateTime, parseApiDateTime } from "@/lib/datetime";
-import type { SelectOption, Task, TaskFormOptionsData, TimesheetsData } from "@/lib/types";
+import type { ActivityTypeOption, ActivityTypesData, SelectOption, Task, TaskFormOptionsData, TimesheetsData } from "@/lib/types";
 import { formatWorkedTime, statusBadgeClass } from "@/lib/utils";
 import { EmptyState, InputShell, LoadingState, Modal, Panel } from "@/components/ui";
+import { StopTimerStatusModal } from "@/components/stop-timer-status-modal";
+import { TimerModal } from "@/components/timer-modal";
+import { useToast } from "@/components/toast-provider";
 
 type VisitItem = {
   key: string;
@@ -391,10 +395,18 @@ function addVisit(map: Record<string, VisitItem[]>, item: VisitItem) {
 function VisitDetailsModal({
   date,
   items,
+  runningTaskId,
+  onStartTask,
+  onStopTimer,
+  stopping,
   onClose
 }: {
   date: string;
   items: VisitItem[];
+  runningTaskId?: string | null;
+  onStartTask: (taskId: string) => void;
+  onStopTimer: () => void;
+  stopping: boolean;
   onClose: () => void;
 }) {
   const runningItems = items.filter((item) => item.kind === "running");
@@ -450,6 +462,17 @@ function VisitDetailsModal({
                       <span>{item.activityType || "Visit activity"}</span>
                       <span>{formatTimeLabel(item.fromTime, item.fromTimeUtc) || "Now"}</span>
                     </div>
+                    <div className="button-row button-row-top">
+                      <button
+                        type="button"
+                        className="timer-action-button timer-action-button-stop"
+                        onClick={onStopTimer}
+                        disabled={stopping}
+                      >
+                        <Square size={15} />
+                        {stopping ? "Stopping..." : "Stop Timer"}
+                      </button>
+                    </div>
                   </article>
                 ))}
               </div>
@@ -478,6 +501,30 @@ function VisitDetailsModal({
                       <span>{item.projectName}</span>
                       <span>{item.rawStatus || "Scheduled"}</span>
                       <span>{item.taskId}</span>
+                    </div>
+                    <div className="button-row button-row-top">
+                      {runningTaskId === item.taskId ? (
+                        <button
+                          type="button"
+                          className="timer-action-button timer-action-button-stop"
+                          onClick={onStopTimer}
+                          disabled={stopping}
+                        >
+                          <Square size={15} />
+                          {stopping ? "Stopping..." : "Stop Timer"}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="timer-action-button timer-action-button-start"
+                          onClick={() => onStartTask(item.taskId)}
+                          disabled={Boolean(runningTaskId)}
+                          title={runningTaskId ? "Stop the current running timer first." : "Start timer for this visit"}
+                        >
+                          <Clock3 size={15} />
+                          Start Timer
+                        </button>
+                      )}
                     </div>
                   </article>
                 ))}
@@ -522,16 +569,23 @@ function VisitDetailsModal({
 }
 
 export function VisitsScreen() {
+  const { showToast } = useToast();
   const [calendarMode, setCalendarMode] = useState<"visit" | "task">("task");
   const [monthCursor, setMonthCursor] = useState(firstOfMonth(new Date()));
   const [selectedDate, setSelectedDate] = useState(dateKey(new Date()));
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [activityTypes, setActivityTypes] = useState<ActivityTypeOption[]>([]);
   const [timesheetData, setTimesheetData] = useState<TimesheetsData | null>(null);
   const [taskFormOptions, setTaskFormOptions] = useState<TaskFormOptionsData>(EMPTY_TASK_FORM_OPTIONS);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showTimerModal, setShowTimerModal] = useState(false);
+  const [timerTaskForStart, setTimerTaskForStart] = useState<Task | null>(null);
+  const [showStopTimerModal, setShowStopTimerModal] = useState(false);
+  const [stopStatusValue, setStopStatusValue] = useState("");
+  const [stopping, setStopping] = useState(false);
   const [showAddTaskForm, setShowAddTaskForm] = useState(false);
   const [newTaskProjectType, setNewTaskProjectType] = useState("");
   const [newTaskProject, setNewTaskProject] = useState("");
@@ -553,13 +607,14 @@ export function VisitsScreen() {
     const fromDate = dateKey(firstOfMonth(monthCursor));
     const toDate = dateKey(endOfMonth(monthCursor));
 
-    const [tasksResult, timesheetsResult, formOptionsResult] = await Promise.allSettled([
+    const [tasksResult, timesheetsResult, formOptionsResult, activityTypesResult] = await Promise.allSettled([
       fetchAction<{ tasks: Task[] }>("tasks"),
       fetchAction<TimesheetsData>("timesheets", {
         from_date: fromDate,
         to_date: toDate
       }),
-      fetchAction<TaskFormOptionsData>("task_form_options")
+      fetchActionCached<TaskFormOptionsData>("task_form_options"),
+      fetchActionCached<ActivityTypesData>("activity_types")
     ]);
 
     if (tasksResult.status === "fulfilled") {
@@ -587,6 +642,17 @@ export function VisitsScreen() {
     } else {
       setTaskFormOptions(EMPTY_TASK_FORM_OPTIONS);
       setNewTaskCustomStatus((current) => current || "");
+    }
+
+    if (activityTypesResult.status === "fulfilled") {
+      const mapped = (activityTypesResult.value.data.activityTypes || []).map((item) =>
+        typeof item === "string"
+          ? { name: item, customParentGroup: "Internal (Others)" }
+          : item
+      );
+      setActivityTypes(mapped);
+    } else {
+      setActivityTypes([]);
     }
 
     setLoading(false);
@@ -827,6 +893,26 @@ export function VisitsScreen() {
     return stats;
   }, [taskData]);
 
+  const taskById = useMemo(() => {
+    return new Map(tasks.map((task) => [task.taskId, task] as const));
+  }, [tasks]);
+
+  const runningTask = useMemo(() => {
+    const runningTaskId = timesheetData?.runningTimer?.task;
+    if (!runningTaskId) {
+      return null;
+    }
+
+    return tasks.find((task) => task.taskId === runningTaskId) ?? null;
+  }, [tasks, timesheetData?.runningTimer?.task]);
+
+  const stopStatusOptions = useMemo(() => {
+    const projectType = runningTask?.customProjectType || "";
+    const mapped = taskFormOptions.statusesByProjectType[projectType] || [];
+    const source = mapped.length > 0 ? mapped : taskFormOptions.statuses;
+    return [...source].sort((a, b) => a.label.localeCompare(b.label));
+  }, [runningTask?.customProjectType, taskFormOptions]);
+
   const flipToMode = (targetMode: "visit" | "task") => {
     if (targetMode === calendarMode) {
       return;
@@ -871,6 +957,124 @@ export function VisitsScreen() {
       setNewTaskName(generatedTaskName);
     }
   }, [generatedTaskName, hasEditedTaskName]);
+
+  const openTaskTimerModal = (task: Task) => {
+    setTimerTaskForStart(task);
+    setShowTimerModal(true);
+  };
+
+  const openVisitItemTimerModal = (taskId: string) => {
+    const task = taskById.get(taskId);
+    if (!task) {
+      showToast({
+        title: "Task not found",
+        message: "This scheduled visit task could not be loaded.",
+        variant: "error"
+      });
+      return;
+    }
+
+    openTaskTimerModal(task);
+  };
+
+  const startTimer = async (task: Task, activityType: string, notes: string) => {
+    const taskId = task?.taskId?.trim();
+
+    if (!taskId) {
+      showToast({
+        title: "Unable to start timer",
+        message: "No task was selected. Please choose a task and try again.",
+        variant: "error"
+      });
+      return;
+    }
+
+    const params: Record<string, string> = { task: taskId, activity_type: activityType };
+    if (notes.trim()) {
+      params.notes = notes.trim();
+    }
+
+    try {
+      await fetchAction("start_timer", params, "POST");
+      setShowTimerModal(false);
+      setTimerTaskForStart(null);
+      showToast({
+        title: "Timer started",
+        message: "Your timer is now running."
+      });
+      await loadCalendarData();
+    } catch (err) {
+      showToast({
+        title: "Unable to start timer",
+        message: err instanceof Error ? err.message : "Please try again.",
+        variant: "error"
+      });
+    }
+  };
+
+  const stopTimer = async () => {
+    if (stopping) {
+      return;
+    }
+
+    setShowStopTimerModal(false);
+    setStopping(true);
+    try {
+      const response = await fetchAction<{
+        message?: string;
+        runningTimer?: { timesheetDetailId?: string } | null;
+      }>("stop_timer");
+
+      const stillRunning = Boolean(response.data?.runningTimer);
+      showToast({
+        title: stillRunning ? "Another timer is still active" : "Timer stopped",
+        message: response.data?.message || "Saved to draft entries.",
+        variant: stillRunning ? "error" : undefined
+      });
+    } catch (err) {
+      showToast({
+        title: "Unable to stop timer",
+        message: err instanceof Error ? err.message : "Please try again.",
+        variant: "error"
+      });
+    } finally {
+      setStopping(false);
+      await loadCalendarData();
+    }
+  };
+
+  const openStopTimerModal = async () => {
+    try {
+      const response = await fetchActionCached<TaskFormOptionsData>("task_form_options");
+      setTaskFormOptions(response.data);
+    } catch {
+      setTaskFormOptions(EMPTY_TASK_FORM_OPTIONS);
+    }
+    setStopStatusValue("");
+    setShowStopTimerModal(true);
+  };
+
+  const updateStatusAndStopTimer = async () => {
+    const taskId = timesheetData?.runningTimer?.task;
+    if (!taskId || !stopStatusValue) {
+      await stopTimer();
+      return;
+    }
+
+    try {
+      await fetchAction("update_task_status", {
+        task_id: taskId,
+        status: stopStatusValue
+      }, "POST");
+      await stopTimer();
+    } catch (err) {
+      showToast({
+        title: "Unable to update status",
+        message: err instanceof Error ? err.message : "Please try again.",
+        variant: "error"
+      });
+    }
+  };
 
   const handleCreateTaskForDate = async () => {
     if (addingTask || !newTaskStartDate || !newTaskCompletionDate) {
@@ -1191,13 +1395,17 @@ export function VisitsScreen() {
         <VisitDetailsModal
           date={selectedDate}
           items={selectedItems}
+          runningTaskId={timesheetData?.runningTimer?.task || null}
+          onStartTask={openVisitItemTimerModal}
+          onStopTimer={() => void openStopTimerModal()}
+          stopping={stopping}
           onClose={() => setIsDetailsOpen(false)}
         />
       ) : null}
       {isDetailsOpen && calendarMode === "task" ? (
         <Modal
           title={formatDayLabel(selectedDate)}
-          subtitle="Tasks planned for this date and current status."
+          subtitle="Tasks planned for this date, with quick timer actions."
           onClose={() => {
             setShowAddTaskForm(false);
             setIsDetailsOpen(false);
@@ -1205,6 +1413,18 @@ export function VisitsScreen() {
           size="wide"
         >
           <div className="task-modal-actions">
+            {timesheetData?.runningTimer ? (
+              <button
+                type="button"
+                className="timer-action-button timer-action-button-stop"
+                onClick={() => void openStopTimerModal()}
+                disabled={stopping}
+                title={timesheetData.runningTimer.taskSubject || "Stop running timer"}
+              >
+                <Square size={16} />
+                {stopping ? "Stopping..." : "Stop Timer"}
+              </button>
+            ) : null}
             <button
               type="button"
               className="ghost-button task-modal-add-btn"
@@ -1342,6 +1562,30 @@ export function VisitsScreen() {
                       <span>{task.ownerName || "No owner"}</span>
                       <span>{cardStatus}</span>
                     </div>
+                    <div className="button-row button-row-top">
+                      {timesheetData?.runningTimer?.task === task.taskId ? (
+                        <button
+                          type="button"
+                          className="timer-action-button timer-action-button-stop"
+                          onClick={() => void openStopTimerModal()}
+                          disabled={stopping}
+                        >
+                          <Square size={15} />
+                          {stopping ? "Stopping..." : "Stop Timer"}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="timer-action-button timer-action-button-start"
+                          onClick={() => openTaskTimerModal(task)}
+                          disabled={Boolean(timesheetData?.runningTimer)}
+                          title={timesheetData?.runningTimer ? "Stop the current running timer first." : "Start timer for this task"}
+                        >
+                          <Clock3 size={15} />
+                          Start Timer
+                        </button>
+                      )}
+                    </div>
                   </article>
                 );
               })}
@@ -1349,6 +1593,30 @@ export function VisitsScreen() {
           )}
         </Modal>
       ) : null}
+      <TimerModal
+        open={showTimerModal}
+        tasks={timerTaskForStart ? [timerTaskForStart] : tasks}
+        activityTypes={activityTypes}
+        initialTask={timerTaskForStart}
+        onClose={() => {
+          setShowTimerModal(false);
+          setTimerTaskForStart(null);
+        }}
+        onStart={startTimer}
+      />
+      <StopTimerStatusModal
+        open={showStopTimerModal}
+        taskSubject={timesheetData?.runningTimer?.taskSubject || ""}
+        projectName={timesheetData?.runningTimer?.projectName || runningTask?.projectName || ""}
+        currentStatus={runningTask?.customCustomStatus || runningTask?.rawStatus || runningTask?.status || ""}
+        statusValue={stopStatusValue}
+        statusOptions={stopStatusOptions}
+        onStatusChange={setStopStatusValue}
+        onClose={() => setShowStopTimerModal(false)}
+        onSkipAndStop={() => void stopTimer()}
+        onUpdateAndStop={() => void updateStatusAndStopTimer()}
+        submitting={stopping}
+      />
     </div>
   );
 }

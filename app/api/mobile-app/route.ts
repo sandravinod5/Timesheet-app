@@ -253,65 +253,15 @@ function filterUserOwnedRunningTimer<T>(entry: T | null | undefined, user: Sessi
   return match ? entry : null;
 }
 
-async function enrichTasksWithCustomStatus(entries: unknown, sid?: string) {
-  if (!Array.isArray(entries) || entries.length === 0) {
-    return entries;
-  }
-
-  const tasks = entries as Array<Record<string, unknown>>;
-  const taskIdsToLoad = Array.from(
-    new Set(
-      tasks
-        .filter((task) => !task.customCustomStatus)
-        .map((task) => (typeof task.taskId === "string" ? task.taskId : ""))
-        .filter(Boolean)
-    )
-  );
-
-  if (taskIdsToLoad.length === 0) {
-    return tasks;
-  }
-
-  const statusByTaskId = new Map<string, string>();
-
-  await Promise.all(
-    taskIdsToLoad.map(async (taskId) => {
-      try {
-        const taskDoc = await fetchErpNextResourceDoc("Task", taskId, sid);
-        const customStatus =
-          typeof taskDoc.custom_custom_status === "string" ? taskDoc.custom_custom_status.trim() : "";
-
-        if (customStatus) {
-          statusByTaskId.set(taskId, customStatus);
-        }
-      } catch {
-        // Keep the original task status if the custom field cannot be loaded.
-      }
-    })
-  );
-
-  if (statusByTaskId.size === 0) {
-    return tasks;
-  }
-
-  return tasks.map((task) => {
-    const taskId = typeof task.taskId === "string" ? task.taskId : "";
-    const customStatus = taskId ? statusByTaskId.get(taskId) : "";
-
-    return customStatus
-      ? {
-          ...task,
-          customCustomStatus: customStatus
-        }
-      : task;
-  });
-}
+// NOTE: custom_custom_status now comes back directly from the server script's
+// get_task_rows / format_task, so the previous per-task fetchErpNextResourceDoc
+// enrichment (one ERPNext HTTP request per task, on every poll) has been removed.
+// That N+1 fan-out was the single biggest source of concurrency overload.
 
 async function filterPayloadForCurrentUser(
   action: string,
   payload: Record<string, unknown>,
-  user: SessionUser | null,
-  sid?: string
+  user: SessionUser | null
 ) {
   if (!user) {
     return payload;
@@ -346,14 +296,6 @@ async function filterPayloadForCurrentUser(
         )
       };
     }
-  }
-
-  if (action === "tasks" && Array.isArray(nextData.tasks)) {
-    nextData.tasks = await enrichTasksWithCustomStatus(nextData.tasks, sid);
-  }
-
-  if (action === "overview" && Array.isArray(nextData.recentTasks)) {
-    nextData.recentTasks = await enrichTasksWithCustomStatus(nextData.recentTasks, sid);
   }
 
   return {
@@ -750,7 +692,7 @@ async function handleRequest(request: NextRequest) {
 
     const payload = await callErpNextMobileApp(action, params, sid);
     const normalizedPayload = attachUtcDateTimes(normalizeKeys(payload)) as Record<string, unknown>;
-    const filteredPayload = await filterPayloadForCurrentUser(action, normalizedPayload, currentUser, sid);
+    const filteredPayload = await filterPayloadForCurrentUser(action, normalizedPayload, currentUser);
 
     return NextResponse.json(filteredPayload, {
       status: payload.success ? 200 : 400

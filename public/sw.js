@@ -1,4 +1,4 @@
-const CACHE_NAME = "erpnext-timesheet-v8";
+const CACHE_NAME = "erpnext-timesheet-v9";
 const APP_SHELL = ["/login", "/manifest.webmanifest", "/icon.svg", "/icon.png"];
 
 async function warmAppShell() {

@@ -1,7 +1,7 @@
 "use client";
 
 import { Briefcase, Building2, CheckCircle2, ClipboardCheck, FileText, Search } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { EmptyState, Modal } from "@/components/ui";
 import type { ActivityTypeOption, Task } from "@/lib/types";
 import { statusBadgeClass } from "@/lib/utils";
@@ -10,12 +10,14 @@ export function TimerModal({
   open,
   tasks,
   activityTypes,
+  initialTask,
   onClose,
   onStart
 }: {
   open: boolean;
   tasks: Task[];
   activityTypes: ActivityTypeOption[];
+  initialTask?: Task | null;
   onClose: () => void;
   onStart: (task: Task, activityType: string, notes: string) => Promise<void>;
 }) {
@@ -26,6 +28,16 @@ export function TimerModal({
   const [activitySearch, setActivitySearch] = useState("");
   const [notes, setNotes] = useState("");
   const [starting, setStarting] = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    if (initialTask) {
+      setSelectedTask(initialTask);
+    }
+  }, [initialTask, open]);
 
   const filteredTasks = useMemo(() => {
     const normalized = search.trim().toLowerCase();
