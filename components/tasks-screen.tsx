@@ -2,7 +2,7 @@
 
 import { Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { fetchAction, fetchActionCached } from "@/lib/client";
+import { fetchAction } from "@/lib/client";
 import { useToast } from "@/components/toast-provider";
 import type { Task, TaskFormOptionsData, TasksData } from "@/lib/types";
 import { statusBadgeClass } from "@/lib/utils";
@@ -96,7 +96,7 @@ export function TasksScreen() {
     setStatusModalLoading(true);
 
     try {
-      const response = await fetchActionCached<TaskFormOptionsData>("task_form_options");
+      const response = await fetchAction<TaskFormOptionsData>("task_form_options");
       setTaskFormOptions(response.data);
     } catch (err) {
       setTaskFormOptions(EMPTY_TASK_FORM_OPTIONS);

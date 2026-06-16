@@ -2,7 +2,7 @@
 
 import { Check, Clock3, FileEdit, Search, Square, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { fetchAction, fetchActionCached } from "@/lib/client";
+import { fetchAction } from "@/lib/client";
 import { formatDateTimeLocalInput, formatLocalDateTime } from "@/lib/datetime";
 import { requestNotificationPermission, shouldSendNotification, showSystemNotification, getNotificationPermissionState } from "@/lib/notifications";
 import type { ActivityTypeOption, ActivityTypesData, DraftEntry, DraftsData, Task, TaskFormOptionsData, TimesheetsData } from "@/lib/types";
@@ -12,10 +12,8 @@ import { StopTimerStatusModal } from "@/components/stop-timer-status-modal";
 import { useToast } from "@/components/toast-provider";
 import { TimerModal } from "@/components/timer-modal";
 
-const ACTIVE_POLL_INTERVAL_MS = 30 * 1000;
-const IDLE_POLL_INTERVAL_MS = 120 * 1000;
-// Random per-client jitter so many clients don't poll in lockstep (thundering herd).
-const POLL_JITTER_MS = 5 * 1000;
+const ACTIVE_POLL_INTERVAL_MS = 15 * 1000;
+const IDLE_POLL_INTERVAL_MS = 60 * 1000;
 const NOTIFICATIONS_MUTED_KEY = "timesheet_notifications_muted";
 const EMPTY_TASK_FORM_OPTIONS: TaskFormOptionsData = {
   projectTypes: [],
@@ -256,7 +254,7 @@ export function TimesheetScreen() {
     const [timesheetsResult, tasksResult, activityTypesResult] = await Promise.allSettled([
       fetchAction<TimesheetsData>("timesheets"),
       fetchAction<{ tasks: Task[] }>("tasks"),
-      fetchActionCached<ActivityTypesData>("activity_types")
+      fetchAction<ActivityTypesData>("activity_types")
     ]);
 
     if (timesheetsResult.status === "fulfilled") {
@@ -295,26 +293,6 @@ export function TimesheetScreen() {
     }
   };
 
-  // Lightweight background poll: only the changing data (timesheets entries +
-  // running timer, and drafts). The task list is refreshed by the fuller load()
-  // on mount and focus; activity_types is static and cached. This avoids
-  // re-running the heavy tasks query on every poll cycle.
-  const pollLight = async () => {
-    setSyncing(true);
-    try {
-      const [timesheetsResult] = await Promise.all([
-        fetchAction<TimesheetsData>("timesheets"),
-        loadDrafts({ silent: true })
-      ]);
-      setPayload(timesheetsResult.data);
-      setLastSyncedAt(new Date());
-    } catch {
-      // Keep last good data on a transient poll failure.
-    } finally {
-      setSyncing(false);
-    }
-  };
-
   useEffect(() => {
     setNotificationPermission(getNotificationPermissionState());
     const storedMuted = localStorage.getItem(NOTIFICATIONS_MUTED_KEY);
@@ -330,13 +308,10 @@ export function TimesheetScreen() {
       }
     };
 
-    const base = payload?.runningTimer ? ACTIVE_POLL_INTERVAL_MS : IDLE_POLL_INTERVAL_MS;
-    const period = base + Math.floor(Math.random() * POLL_JITTER_MS);
-    const interval = window.setInterval(() => {
-      if (document.visibilityState === "visible") {
-        void pollLight();
-      }
-    }, period);
+    const interval = window.setInterval(
+      refresh,
+      payload?.runningTimer ? ACTIVE_POLL_INTERVAL_MS : IDLE_POLL_INTERVAL_MS
+    );
     window.addEventListener("focus", refresh);
     document.addEventListener("visibilitychange", refresh);
 
@@ -603,7 +578,7 @@ export function TimesheetScreen() {
 
   const openStopTimerModal = async () => {
     try {
-      const response = await fetchActionCached<TaskFormOptionsData>("task_form_options");
+      const response = await fetchAction<TaskFormOptionsData>("task_form_options");
       setTaskFormOptions(response.data);
     } catch {
       setTaskFormOptions(EMPTY_TASK_FORM_OPTIONS);

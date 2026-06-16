@@ -11,7 +11,7 @@ import {
   Square,
   Sparkles
 } from "lucide-react";
-import { fetchAction, fetchActionCached } from "@/lib/client";
+import { fetchAction } from "@/lib/client";
 import { formatLocalDate, formatLocalTime, getDateKeyFromDateTime, parseApiDateTime } from "@/lib/datetime";
 import type { ActivityTypeOption, ActivityTypesData, SelectOption, Task, TaskFormOptionsData, TimesheetsData } from "@/lib/types";
 import { formatWorkedTime, statusBadgeClass } from "@/lib/utils";
@@ -613,8 +613,8 @@ export function VisitsScreen() {
         from_date: fromDate,
         to_date: toDate
       }),
-      fetchActionCached<TaskFormOptionsData>("task_form_options"),
-      fetchActionCached<ActivityTypesData>("activity_types")
+      fetchAction<TaskFormOptionsData>("task_form_options"),
+      fetchAction<ActivityTypesData>("activity_types")
     ]);
 
     if (tasksResult.status === "fulfilled") {
@@ -1045,7 +1045,7 @@ export function VisitsScreen() {
 
   const openStopTimerModal = async () => {
     try {
-      const response = await fetchActionCached<TaskFormOptionsData>("task_form_options");
+      const response = await fetchAction<TaskFormOptionsData>("task_form_options");
       setTaskFormOptions(response.data);
     } catch {
       setTaskFormOptions(EMPTY_TASK_FORM_OPTIONS);
