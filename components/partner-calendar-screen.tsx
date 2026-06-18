@@ -487,7 +487,7 @@ export function PartnerCalendarScreen() {
             refreshToken={calendarRefreshToken}
             onToggleOpen={() => setCalendarOpen((current) => !current)}
             onEntriesChanged={() => {
-              void load({ silent: true });
+              void load(weekCursor || new Date(), { silent: true, preferCache: true });
             }}
           />
         ) : (
