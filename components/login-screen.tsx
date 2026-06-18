@@ -17,21 +17,29 @@ export function LoginScreen() {
     setLoading(true);
     setError("");
 
-    const response = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password })
-    });
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password })
+      });
 
-    const payload = (await response.json()) as { error?: string };
+      const contentType = response.headers.get("content-type") || "";
+      const payload = contentType.includes("application/json")
+        ? ((await response.json().catch(() => ({}))) as { error?: string })
+        : null;
 
-    if (!response.ok) {
-      setError(payload.error || "Unable to sign in.");
+      if (!response.ok) {
+        setError(payload?.error || `Unable to sign in (${response.status}).`);
+        return;
+      }
+
+      window.location.assign("/");
+    } catch {
+      setError("Sign in could not be completed right now. Please try again.");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    window.location.assign("/");
   };
 
   return (

@@ -4018,6 +4018,34 @@ th {
   color: #2a74dd;
 }
 
+[data-theme="dark"] .management-calendar-summary-card {
+  background:
+    linear-gradient(180deg, rgba(28, 36, 60, 0.98), rgba(19, 26, 45, 0.98));
+  border: 1px solid rgba(101, 128, 201, 0.14);
+  box-shadow:
+    14px 14px 30px rgba(6, 10, 22, 0.52),
+    -10px -10px 24px rgba(46, 60, 99, 0.12);
+}
+
+[data-theme="dark"] .management-calendar-summary-card::before {
+  background: linear-gradient(90deg, #5fa4ff 0%, #2f78e4 45%, #7dc4ff 100%);
+}
+
+[data-theme="dark"] .management-calendar-summary-period {
+  background:
+    linear-gradient(180deg, rgba(57, 103, 194, 0.28), rgba(29, 52, 102, 0.24)),
+    linear-gradient(180deg, rgba(34, 44, 72, 0.98), rgba(24, 31, 53, 0.98));
+  border-color: rgba(99, 140, 230, 0.28);
+  color: #edf4ff;
+  box-shadow:
+    inset 1px 1px 0 rgba(139, 172, 255, 0.12),
+    0 12px 28px rgba(12, 22, 52, 0.28);
+}
+
+[data-theme="dark"] .management-calendar-summary-period svg {
+  color: #7db5ff;
+}
+
 .management-planner-toolbar {
   align-items: center;
 }
@@ -4058,6 +4086,26 @@ th {
   white-space: nowrap;
 }
 
+[data-theme="dark"] .management-planner-status,
+[data-theme="dark"] .management-planner-badge {
+  background:
+    linear-gradient(180deg, rgba(43, 57, 93, 0.95), rgba(24, 32, 54, 0.98));
+  border-color: rgba(97, 122, 191, 0.26);
+  color: #eef4ff;
+}
+
+[data-theme="dark"] .management-planner-hero,
+[data-theme="dark"] .management-planner-panel,
+[data-theme="dark"] .management-meeting-calendar-section > .panel,
+[data-theme="dark"] .management-calendar-embedded > .panel {
+  background:
+    linear-gradient(180deg, rgba(26, 34, 58, 0.98), rgba(18, 24, 42, 0.98));
+  border: 1px solid rgba(90, 116, 182, 0.14);
+  box-shadow:
+    14px 14px 30px rgba(6, 10, 22, 0.54),
+    -10px -10px 24px rgba(48, 61, 101, 0.08);
+}
+
 .management-planner-panel {
   grid-column: 1 / -1;
   overflow: hidden;
@@ -4079,6 +4127,15 @@ th {
   border: 1px solid var(--border);
   background: linear-gradient(180deg, var(--surface-strong), var(--card-surface-end));
   scrollbar-color: #2e79eb rgba(122, 144, 245, 0.16);
+}
+
+[data-theme="dark"] .management-planner-table-wrap {
+  background:
+    linear-gradient(180deg, rgba(25, 33, 57, 0.98), rgba(17, 23, 39, 0.98));
+  border-color: rgba(88, 112, 176, 0.18);
+  box-shadow:
+    inset 0 1px 0 rgba(107, 131, 197, 0.08),
+    0 16px 34px rgba(8, 12, 26, 0.34);
 }
 
 .management-planner-table-wrap::-webkit-scrollbar,
@@ -4144,7 +4201,9 @@ th {
 }
 
 [data-theme="dark"] .management-planner-table tbody td {
-  background: rgba(18, 24, 42, 0.58);
+  background: rgba(24, 32, 55, 0.94);
+  border-right-color: rgba(86, 107, 163, 0.2);
+  border-bottom-color: rgba(86, 107, 163, 0.2);
 }
 
 .management-planner-table tbody td:last-child,
@@ -4160,7 +4219,16 @@ th {
 }
 
 [data-theme="dark"] .management-planner-date-day-cell {
-  background: rgba(23, 31, 53, 0.88) !important;
+  background: rgba(30, 40, 66, 0.98) !important;
+}
+
+[data-theme="dark"] .management-planner-date-text,
+[data-theme="dark"] .management-planner-session-cell {
+  color: #eff5ff;
+}
+
+[data-theme="dark"] .management-planner-day-text {
+  color: rgba(186, 202, 233, 0.76);
 }
 
 .management-planner-date-text,
@@ -4206,13 +4274,21 @@ th {
 }
 
 [data-theme="dark"] .management-planner-input {
-  background: rgba(17, 23, 38, 0.86);
-  color: var(--foreground);
+  background: linear-gradient(180deg, rgba(16, 23, 39, 0.98), rgba(11, 17, 31, 0.98));
+  color: #f2f6ff;
+  border-color: rgba(99, 129, 206, 0.34);
+  box-shadow:
+    inset 1px 1px 0 rgba(133, 162, 230, 0.08),
+    0 0 0 1px rgba(19, 29, 49, 0.35);
 }
 
 .management-planner-input::placeholder {
   color: rgba(108, 122, 137, 0.8);
   font-weight: 500;
+}
+
+[data-theme="dark"] .management-planner-input::placeholder {
+  color: rgba(167, 184, 219, 0.54);
 }
 
 .management-planner-cell-hint {
@@ -4273,6 +4349,13 @@ th {
   background: linear-gradient(180deg, var(--surface-strong), var(--card-surface-end));
 }
 
+[data-theme="dark"] .management-month-grid-head-cell {
+  background:
+    linear-gradient(180deg, rgba(41, 53, 87, 0.98), rgba(26, 35, 59, 0.98));
+  border: 1px solid rgba(88, 113, 179, 0.2);
+  color: #dce9ff;
+}
+
 .management-month-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -4293,9 +4376,29 @@ th {
   transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
+[data-theme="dark"] .management-month-day {
+  background:
+    linear-gradient(180deg, rgba(38, 49, 81, 0.98), rgba(24, 32, 54, 0.98));
+  border-color: rgba(83, 108, 171, 0.26);
+  box-shadow:
+    inset 1px 1px 0 rgba(117, 142, 206, 0.08),
+    0 12px 28px rgba(7, 11, 24, 0.22);
+}
+
 .management-month-day:hover {
   transform: translateY(-2px);
   border-color: rgba(74, 144, 226, 0.32);
+}
+
+[data-theme="dark"] .management-month-day:hover {
+  border-color: rgba(104, 161, 255, 0.46);
+  box-shadow:
+    inset 1px 1px 0 rgba(142, 168, 235, 0.12),
+    0 16px 34px rgba(7, 11, 24, 0.3);
+}
+
+[data-theme="dark"] .management-month-day--muted {
+  opacity: 0.45;
 }
 
 .management-month-day--muted {
@@ -4327,6 +4430,15 @@ th {
   font-weight: 800;
 }
 
+[data-theme="dark"] .management-month-day-head strong {
+  color: #f3f7ff;
+}
+
+[data-theme="dark"] .management-month-day-head span {
+  color: #8ec0ff;
+  background: rgba(61, 111, 201, 0.26);
+}
+
 .management-month-day-list {
   display: grid;
   gap: 0.5rem;
@@ -4346,6 +4458,19 @@ th {
   color: var(--primary);
   font-size: 0.82rem;
   font-weight: 700;
+}
+
+[data-theme="dark"] .management-month-day-summary {
+  color: rgba(187, 202, 233, 0.82);
+}
+
+[data-theme="dark"] .meeting-day-empty {
+  color: #7eaefe;
+}
+
+[data-theme="dark"] .meeting-day-empty span,
+[data-theme="dark"] .management-month-day-summary {
+  text-shadow: none;
 }
 
 .management-calendar-modal {
@@ -4381,6 +4506,12 @@ th {
   font-weight: 700;
 }
 
+[data-theme="dark"] .management-calendar-timeslot {
+  background: linear-gradient(180deg, rgba(39, 51, 82, 0.98), rgba(22, 31, 53, 0.98));
+  border-color: rgba(90, 116, 182, 0.28);
+  color: #e7efff;
+}
+
 .management-calendar-timeslot.is-active {
   color: #fff;
   border-color: rgba(43, 114, 255, 0.48);
@@ -4406,6 +4537,15 @@ th {
   box-shadow: inset 1px 1px 0 var(--card-inset-highlight);
 }
 
+[data-theme="dark"] .partner-calendar-entry {
+  background:
+    linear-gradient(180deg, rgba(37, 49, 80, 0.98), rgba(22, 31, 52, 0.98));
+  border-color: rgba(87, 112, 175, 0.24);
+  box-shadow:
+    inset 1px 1px 0 rgba(118, 142, 205, 0.08),
+    0 10px 24px rgba(7, 12, 26, 0.2);
+}
+
 .partner-calendar-entry-row {
   display: flex;
   align-items: flex-start;
@@ -4427,6 +4567,30 @@ th {
   margin-top: 0.3rem;
   color: var(--muted);
   font-size: 0.88rem;
+}
+
+[data-theme="dark"] .partner-calendar-entry-title {
+  color: #f2f7ff;
+}
+
+[data-theme="dark"] .partner-calendar-entry-subtitle {
+  color: rgba(186, 201, 232, 0.76);
+}
+
+[data-theme="dark"] .management-calendar-day-entries .panel-title,
+[data-theme="dark"] .management-planner-hero .panel-title,
+[data-theme="dark"] .management-calendar-summary-card .panel-title,
+[data-theme="dark"] .management-planner-panel .panel-title,
+[data-theme="dark"] .management-calendar-summary-card .panel-subtitle,
+[data-theme="dark"] .management-planner-hero .panel-subtitle,
+[data-theme="dark"] .management-planner-hero .panel-eyebrow {
+  color: #eef5ff;
+}
+
+[data-theme="dark"] .management-calendar-summary-card .panel-subtitle,
+[data-theme="dark"] .management-planner-hero .panel-subtitle,
+[data-theme="dark"] .management-planner-hero .panel-eyebrow {
+  opacity: 0.82;
 }
 
 .partner-calendar-slot {
@@ -4454,6 +4618,34 @@ th {
 .partner-calendar-slot--evening {
   color: #0e7a52;
   background: rgba(20, 184, 122, 0.16);
+}
+
+[data-theme="dark"] .partner-calendar-slot--morning {
+  color: #9bc7ff;
+  background: rgba(58, 114, 214, 0.22);
+}
+
+[data-theme="dark"] .partner-calendar-slot--afternoon {
+  color: #ffd58a;
+  background: rgba(179, 124, 28, 0.24);
+}
+
+[data-theme="dark"] .partner-calendar-slot--evening {
+  color: #8ef0bf;
+  background: rgba(20, 138, 94, 0.24);
+}
+
+[data-theme="dark"] .management-planner-table-wrap::-webkit-scrollbar-thumb,
+[data-theme="dark"] .management-month-scroll::-webkit-scrollbar-thumb,
+[data-theme="dark"] .searchable-select-menu::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #63a7ff, #2c75df);
+  border-color: rgba(18, 24, 42, 0.58);
+}
+
+[data-theme="dark"] .management-planner-table-wrap::-webkit-scrollbar-track,
+[data-theme="dark"] .management-month-scroll::-webkit-scrollbar-track,
+[data-theme="dark"] .searchable-select-menu::-webkit-scrollbar-track {
+  background: linear-gradient(180deg, rgba(34, 44, 72, 0.88), rgba(20, 27, 46, 0.92));
 }
 
 .searchable-select-shell {
