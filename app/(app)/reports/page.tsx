@@ -1,5 +1,11 @@
-import { ReportsScreen } from "@/components/reports-screen";
+import { EmptyState, Panel } from "@/components/ui";
 
 export default function ReportsPage() {
-  return <ReportsScreen />;
+  return (
+    <div className="screen-stack screen-stack--single">
+      <Panel>
+        <EmptyState title="Coming soon" copy="Reports will be available here soon." />
+      </Panel>
+    </div>
+  );
 }

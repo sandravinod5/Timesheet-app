@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, RefreshCw, Save, Users } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, RefreshCw, Save } from "lucide-react";
 import { fetchPartnerCalendarAction } from "@/lib/client";
 import type { WeeklyPlannerCellChange, WeeklyPlannerData, WeeklyPlannerRow } from "@/lib/types";
 import { ManagementCalendarScreen } from "@/components/management-calendar-screen";
@@ -72,6 +72,7 @@ export function PartnerCalendarScreen() {
   const [weekCursor, setWeekCursor] = useState<Date | null>(null);
   const [data, setData] = useState<WeeklyPlannerData | null>(null);
   const [draftValues, setDraftValues] = useState<Record<string, string>>({});
+  const [mobileColumnKey, setMobileColumnKey] = useState("");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -80,13 +81,20 @@ export function PartnerCalendarScreen() {
   const [showCalendarOverview, setShowCalendarOverview] = useState(false);
   const [plannerOpen, setPlannerOpen] = useState(true);
   const [calendarOpen, setCalendarOpen] = useState(true);
+  const weekCacheRef = useRef<Record<string, WeeklyPlannerData>>({});
+  const inFlightPrefetchRef = useRef<Record<string, boolean>>({});
 
-  const load = async (options?: { silent?: boolean }) => {
-    if (!weekCursor) {
-      return;
+  const load = async (targetWeek: Date, options?: { silent?: boolean; preferCache?: boolean }) => {
+    const weekKey = `${dateKey(startOfWeek(targetWeek))}__${dateKey(endOfWeek(targetWeek))}`;
+    const cachedData = weekCacheRef.current[weekKey];
+    const silent = options?.silent ?? Boolean(data || cachedData);
+    const preferCache = options?.preferCache !== false;
+
+    if (preferCache && cachedData) {
+      setData(cachedData);
+      setDraftValues(initialDraftMap(cachedData.rows || []));
     }
 
-    const silent = Boolean(options?.silent);
     if (silent) {
       setRefreshing(true);
     } else {
@@ -95,18 +103,43 @@ export function PartnerCalendarScreen() {
 
     setError(null);
 
-    const fromDate = dateKey(startOfWeek(weekCursor));
-    const toDate = dateKey(endOfWeek(weekCursor));
+    const fromDate = dateKey(startOfWeek(targetWeek));
+    const toDate = dateKey(endOfWeek(targetWeek));
+
+    const prefetchWeek = async (date: Date) => {
+      const prefetchKey = `${dateKey(startOfWeek(date))}__${dateKey(endOfWeek(date))}`;
+      if (weekCacheRef.current[prefetchKey] || inFlightPrefetchRef.current[prefetchKey]) {
+        return;
+      }
+
+      inFlightPrefetchRef.current[prefetchKey] = true;
+      try {
+        const response = await fetchPartnerCalendarAction<WeeklyPlannerData>("weekly_grid", {
+          from_date: dateKey(startOfWeek(date)),
+          to_date: dateKey(endOfWeek(date))
+        });
+        weekCacheRef.current[prefetchKey] = response.data;
+      } catch {
+        return;
+      } finally {
+        delete inFlightPrefetchRef.current[prefetchKey];
+      }
+    };
 
     try {
       const response = await fetchPartnerCalendarAction<WeeklyPlannerData>("weekly_grid", {
         from_date: fromDate,
         to_date: toDate
       });
+      weekCacheRef.current[weekKey] = response.data;
       setData(response.data);
       setDraftValues(initialDraftMap(response.data.rows || []));
+      void prefetchWeek(shiftWeek(targetWeek, -1));
+      void prefetchWeek(shiftWeek(targetWeek, 1));
     } catch (loadError) {
-      setData(null);
+      if (!cachedData && !data) {
+        setData(null);
+      }
       setError(loadError instanceof Error ? loadError.message : "Weekly planner could not be loaded.");
     } finally {
       setLoading(false);
@@ -123,7 +156,9 @@ export function PartnerCalendarScreen() {
       return;
     }
 
-    void load();
+    void load(weekCursor, {
+      silent: Boolean(data || weekCacheRef.current[`${dateKey(startOfWeek(weekCursor))}__${dateKey(endOfWeek(weekCursor))}`])
+    });
   }, [weekCursor]);
 
   useEffect(() => {
@@ -137,6 +172,16 @@ export function PartnerCalendarScreen() {
 
     return () => window.clearTimeout(timeoutId);
   }, [data, showCalendarOverview]);
+
+  useEffect(() => {
+    if (!data?.columns?.length) {
+      return;
+    }
+
+    if (!mobileColumnKey || !data.columns.some((column) => column.key === mobileColumnKey)) {
+      setMobileColumnKey(data.columns[0].key);
+    }
+  }, [data?.columns, mobileColumnKey]);
 
   const changedCells = useMemo(() => {
     if (!data) {
@@ -186,6 +231,14 @@ export function PartnerCalendarScreen() {
     return groups;
   }, [data?.rows]);
 
+  const mobileColumn = useMemo(() => {
+    if (!data?.columns?.length) {
+      return null;
+    }
+
+    return data.columns.find((column) => column.key === mobileColumnKey) || data.columns[0];
+  }, [data?.columns, mobileColumnKey]);
+
   const handleSave = async () => {
     if (changedCells.length === 0) {
       return;
@@ -203,7 +256,7 @@ export function PartnerCalendarScreen() {
         "POST"
       );
 
-      await load({ silent: true });
+      await load(weekCursor || new Date(), { silent: true, preferCache: true });
       setCalendarRefreshToken((current) => current + 1);
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Planner changes could not be saved.");
@@ -212,7 +265,7 @@ export function PartnerCalendarScreen() {
     }
   };
 
-  if (!weekCursor || loading) {
+  if (!weekCursor || (loading && !data)) {
     return <LoadingState label="Loading management meeting planner..." />;
   }
 
@@ -242,7 +295,7 @@ export function PartnerCalendarScreen() {
         <div className="management-planner-actions">
           <button
             className={refreshing ? "ghost-button is-spinning" : "ghost-button"}
-            onClick={() => void load({ silent: true })}
+            onClick={() => void load(weekCursor, { silent: true, preferCache: true })}
             aria-label="Refresh planner"
             type="button"
           >
@@ -277,16 +330,6 @@ export function PartnerCalendarScreen() {
               <ChevronRight size={18} />
             </button>
           </div>
-
-          <div className="management-planner-meta">
-            <span className="management-planner-status">
-              {changedCells.length === 0 ? "No pending changes" : `${changedCells.length} unsaved change${changedCells.length > 1 ? "s" : ""}`}
-            </span>
-            <span className="management-planner-badge">
-              <Users size={14} />
-              {data.columns.length} team columns
-            </span>
-          </div>
         </div>
       </Panel>
 
@@ -311,57 +354,127 @@ export function PartnerCalendarScreen() {
             </button>
           </div>
           {plannerOpen ? (
-            <div className="management-planner-table-wrap">
-              <table className="management-planner-table">
-                <thead>
-                  <tr>
-                    <th>Date / Day</th>
-                    <th>Session</th>
-                    {data.columns.map((column) => (
-                      <th key={column.key}>{column.label}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {groupedRows.map((group) =>
-                    group.rows.map((row, rowIndex) => (
-                      <tr
-                        key={`${row.date}-${row.session}`}
-                        className={rowIndex === group.rows.length - 1 ? "management-planner-day-end" : undefined}
-                      >
-                        {rowIndex === 0 ? (
-                          <td rowSpan={group.rows.length} className="management-planner-date-day-cell">
-                            <span className="management-planner-date-text">{displayDate(group.date)}</span>
-                            <span className="management-planner-day-text">{group.dayLabel}</span>
-                          </td>
-                        ) : null}
-                        <td className="management-planner-session-cell">{row.session}</td>
-                        {data.columns.map((column) => {
-                          const key = getCellKey(row.date, row.session, column.key);
-                          const currentValue = draftValues[key] || "";
-                          return (
-                            <td key={key} className="management-planner-entry-cell">
-                              <input
-                                className="management-planner-input"
-                                value={currentValue}
-                                onChange={(event) =>
-                                  setDraftValues((current) => ({
-                                    ...current,
-                                    [key]: event.target.value
-                                  }))
-                                }
-                                placeholder="Add entry"
-                                aria-label={`${column.label} ${row.session} entry for ${group.dayLabel} ${displayDate(group.date)}`}
-                              />
+            <>
+              <div className="management-planner-mobile-switcher" aria-label="Choose team member">
+                <div className="management-planner-mobile-switcher-track">
+                  {data.columns.map((column) => (
+                    <button
+                      key={column.key}
+                      type="button"
+                      className={`management-planner-mobile-user-button ${
+                        mobileColumn?.key === column.key ? "is-active" : ""
+                      }`}
+                      onClick={() => setMobileColumnKey(column.key)}
+                    >
+                      {column.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="management-planner-table-wrap management-planner-table-desktop">
+                <table className="management-planner-table">
+                  <thead>
+                    <tr>
+                      <th>Date / Day</th>
+                      <th>Session</th>
+                      {data.columns.map((column) => (
+                        <th key={column.key}>{column.label}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {groupedRows.map((group) =>
+                      group.rows.map((row, rowIndex) => (
+                        <tr
+                          key={`${row.date}-${row.session}`}
+                          className={rowIndex === group.rows.length - 1 ? "management-planner-day-end" : undefined}
+                        >
+                          {rowIndex === 0 ? (
+                            <td rowSpan={group.rows.length} className="management-planner-date-day-cell">
+                              <span className="management-planner-date-text">{displayDate(group.date)}</span>
+                              <span className="management-planner-day-text">{group.dayLabel}</span>
                             </td>
-                          );
-                        })}
+                          ) : null}
+                          <td className="management-planner-session-cell">{row.session}</td>
+                          {data.columns.map((column) => {
+                            const key = getCellKey(row.date, row.session, column.key);
+                            const currentValue = draftValues[key] || "";
+                            return (
+                              <td key={key} className="management-planner-entry-cell">
+                                <input
+                                  className="management-planner-input"
+                                  value={currentValue}
+                                  onChange={(event) =>
+                                    setDraftValues((current) => ({
+                                      ...current,
+                                      [key]: event.target.value
+                                    }))
+                                  }
+                                  placeholder="Add entry"
+                                  aria-label={`${column.label} ${row.session} entry for ${group.dayLabel} ${displayDate(group.date)}`}
+                                />
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {mobileColumn ? (
+                <div className="management-planner-table-wrap management-planner-table-mobile">
+                  <table className="management-planner-table">
+                    <thead>
+                      <tr>
+                        <th>Date / Day</th>
+                        <th>Session</th>
+                        <th>{mobileColumn.label}</th>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                    </thead>
+                    <tbody>
+                      {groupedRows.map((group) =>
+                        group.rows.map((row, rowIndex) => {
+                          const key = getCellKey(row.date, row.session, mobileColumn.key);
+                          const currentValue = draftValues[key] || "";
+
+                          return (
+                            <tr
+                              key={`${row.date}-${row.session}-${mobileColumn.key}`}
+                              className={rowIndex === group.rows.length - 1 ? "management-planner-day-end" : undefined}
+                            >
+                              {rowIndex === 0 ? (
+                                <td rowSpan={group.rows.length} className="management-planner-date-day-cell">
+                                  <span className="management-planner-date-text">{displayDate(group.date)}</span>
+                                  <span className="management-planner-day-text">{group.dayLabel}</span>
+                                </td>
+                              ) : null}
+                              <td className="management-planner-session-cell">{row.session}</td>
+                              <td className="management-planner-entry-cell">
+                                <input
+                                  className="management-planner-input"
+                                  value={currentValue}
+                                  onChange={(event) =>
+                                    setDraftValues((current) => ({
+                                      ...current,
+                                      [key]: event.target.value
+                                    }))
+                                  }
+                                  placeholder="Add entry"
+                                  aria-label={`${mobileColumn.label} ${row.session} entry for ${group.dayLabel} ${displayDate(group.date)}`}
+                                />
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              ) : null}
+            </>
           ) : null}
         </Panel>
       )}
