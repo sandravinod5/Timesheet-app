@@ -3,6 +3,8 @@
 import { useEffect } from "react";
 
 const CHUNK_RELOAD_KEY = "chunk-reload-attempted";
+const SW_VERSION = "2026-06-18-01";
+const ENABLE_SERVICE_WORKER = process.env.NEXT_PUBLIC_ENABLE_PWA_SW === "true";
 
 function shouldReloadForChunkError(message: string) {
   return /ChunkLoadError|Loading chunk [\d]+ failed|Failed to fetch dynamically imported module|Loading CSS chunk [\d]+ failed/i.test(
@@ -71,7 +73,7 @@ export function PwaRegister() {
     window.addEventListener("unhandledrejection", onUnhandledRejection);
     clearReloadFlag();
 
-    if (process.env.NODE_ENV !== "production") {
+    const unregisterAllServiceWorkers = async () => {
       void navigator.serviceWorker.getRegistrations().then((registrations) => {
         registrations.forEach((registration) => {
           void registration.unregister();
@@ -85,11 +87,16 @@ export function PwaRegister() {
           });
         });
       }
+    };
+
+    if (process.env.NODE_ENV !== "production" || !ENABLE_SERVICE_WORKER) {
+      void unregisterAllServiceWorkers();
 
       return cleanupChunkReloadHandlers;
     }
 
     let reloaded = false;
+    const serviceWorkerUrl = `/sw.js?v=${SW_VERSION}`;
     const onControllerChange = () => {
       if (reloaded) {
         return;
@@ -100,8 +107,30 @@ export function PwaRegister() {
 
     navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
 
-    navigator.serviceWorker
-      .register("/sw.js")
+    void navigator.serviceWorker
+      .getRegistrations()
+      .then((registrations) =>
+        Promise.all(
+          registrations.map(async (registration) => {
+            const scriptUrl =
+              registration.active?.scriptURL ||
+              registration.waiting?.scriptURL ||
+              registration.installing?.scriptURL ||
+              "";
+
+            if (!scriptUrl || scriptUrl.includes(`v=${SW_VERSION}`)) {
+              return;
+            }
+
+            await registration.unregister();
+          })
+        )
+      )
+      .then(() =>
+        navigator.serviceWorker.register(serviceWorkerUrl, {
+          updateViaCache: "none"
+        })
+      )
       .then((registration) => {
         void registration.update();
 
