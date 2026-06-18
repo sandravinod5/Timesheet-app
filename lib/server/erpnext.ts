@@ -337,7 +337,12 @@ export async function getResolvedSessionUser(user?: SessionUser | null, sid?: st
 }
 
 export function createSessionCookies(response: NextResponse, session: SessionData) {
-  const encodedUser = encodeURIComponent(JSON.stringify(session.user));
+  const compactUser = {
+    email: session.user.email,
+    displayName: session.user.displayName,
+    isPartnerCalendarUser: session.user.isPartnerCalendarUser ?? false
+  };
+  const encodedUser = encodeURIComponent(JSON.stringify(compactUser));
 
   response.cookies.set("task_mobile_user", encodedUser, {
     httpOnly: true,
@@ -346,12 +351,12 @@ export function createSessionCookies(response: NextResponse, session: SessionDat
     path: "/",
     maxAge: 60 * 60 * 12
   });
-  response.cookies.set("task_mobile_user_encoded", encodedUser, {
+  response.cookies.set("task_mobile_user_encoded", "", {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
-    maxAge: 60 * 60 * 12
+    maxAge: 0
   });
   response.cookies.set("task_mobile_authenticated", "1", {
     httpOnly: true,
