@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, ChevronLeft, ChevronRight, RefreshCw, Save, Users } from "lucide-react";
+import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, RefreshCw, Save, Users } from "lucide-react";
 import { fetchPartnerCalendarAction } from "@/lib/client";
 import type { WeeklyPlannerCellChange, WeeklyPlannerData, WeeklyPlannerRow } from "@/lib/types";
 import { ManagementCalendarScreen } from "@/components/management-calendar-screen";
@@ -78,6 +78,8 @@ export function PartnerCalendarScreen() {
   const [error, setError] = useState<string | null>(null);
   const [calendarRefreshToken, setCalendarRefreshToken] = useState(0);
   const [showCalendarOverview, setShowCalendarOverview] = useState(false);
+  const [plannerOpen, setPlannerOpen] = useState(true);
+  const [calendarOpen, setCalendarOpen] = useState(true);
 
   const load = async (options?: { silent?: boolean }) => {
     if (!weekCursor) {
@@ -294,58 +296,73 @@ export function PartnerCalendarScreen() {
         </Panel>
       ) : (
         <Panel className="management-planner-panel">
-          <div className="management-planner-table-wrap">
-            <table className="management-planner-table">
-              <thead>
-                <tr>
-                  <th>Date / Day</th>
-                  <th>Session</th>
-                  {data.columns.map((column) => (
-                    <th key={column.key}>{column.label}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {groupedRows.map((group) =>
-                  group.rows.map((row, rowIndex) => (
-                    <tr
-                      key={`${row.date}-${row.session}`}
-                      className={rowIndex === group.rows.length - 1 ? "management-planner-day-end" : undefined}
-                    >
-                      {rowIndex === 0 ? (
-                        <td rowSpan={group.rows.length} className="management-planner-date-day-cell">
-                          <span className="management-planner-date-text">{displayDate(group.date)}</span>
-                          <span className="management-planner-day-text">{group.dayLabel}</span>
-                        </td>
-                      ) : null}
-                      <td className="management-planner-session-cell">{row.session}</td>
-                      {data.columns.map((column) => {
-                        const key = getCellKey(row.date, row.session, column.key);
-                        const currentValue = draftValues[key] || "";
-                        return (
-                          <td key={key} className="management-planner-entry-cell">
-                            <input
-                              className="management-planner-input"
-                              value={currentValue}
-                              onChange={(event) =>
-                                setDraftValues((current) => ({
-                                  ...current,
-                                  [key]: event.target.value
-                                }))
-                              }
-                              placeholder="Add entry"
-                              aria-label={`${column.label} ${row.session} entry for ${group.dayLabel} ${displayDate(group.date)}`}
-                            />
-                            {!currentValue ? <span className="management-planner-cell-hint">Add entry</span> : null}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+          <div className="panel-title-row management-card-collapse-row">
+            <div>
+              <h2 className="panel-title">Weekly Planner</h2>
+            </div>
+            <button
+              type="button"
+              className="ghost-button management-card-toggle"
+              aria-expanded={plannerOpen}
+              aria-label={plannerOpen ? "Collapse weekly planner" : "Expand weekly planner"}
+              onClick={() => setPlannerOpen((current) => !current)}
+            >
+              <ChevronDown size={18} className={`collapsible-chevron ${plannerOpen ? "is-open" : ""}`} />
+            </button>
           </div>
+          {plannerOpen ? (
+            <div className="management-planner-table-wrap">
+              <table className="management-planner-table">
+                <thead>
+                  <tr>
+                    <th>Date / Day</th>
+                    <th>Session</th>
+                    {data.columns.map((column) => (
+                      <th key={column.key}>{column.label}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {groupedRows.map((group) =>
+                    group.rows.map((row, rowIndex) => (
+                      <tr
+                        key={`${row.date}-${row.session}`}
+                        className={rowIndex === group.rows.length - 1 ? "management-planner-day-end" : undefined}
+                      >
+                        {rowIndex === 0 ? (
+                          <td rowSpan={group.rows.length} className="management-planner-date-day-cell">
+                            <span className="management-planner-date-text">{displayDate(group.date)}</span>
+                            <span className="management-planner-day-text">{group.dayLabel}</span>
+                          </td>
+                        ) : null}
+                        <td className="management-planner-session-cell">{row.session}</td>
+                        {data.columns.map((column) => {
+                          const key = getCellKey(row.date, row.session, column.key);
+                          const currentValue = draftValues[key] || "";
+                          return (
+                            <td key={key} className="management-planner-entry-cell">
+                              <input
+                                className="management-planner-input"
+                                value={currentValue}
+                                onChange={(event) =>
+                                  setDraftValues((current) => ({
+                                    ...current,
+                                    [key]: event.target.value
+                                  }))
+                                }
+                                placeholder="Add entry"
+                                aria-label={`${column.label} ${row.session} entry for ${group.dayLabel} ${displayDate(group.date)}`}
+                              />
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
         </Panel>
       )}
 
@@ -353,7 +370,9 @@ export function PartnerCalendarScreen() {
         {showCalendarOverview ? (
           <ManagementCalendarScreen
             embedded
+            open={calendarOpen}
             refreshToken={calendarRefreshToken}
+            onToggleOpen={() => setCalendarOpen((current) => !current)}
             onEntriesChanged={() => {
               void load({ silent: true });
             }}

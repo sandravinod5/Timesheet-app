@@ -1,14 +1,8 @@
 import { AppShell } from "@/components/app-shell";
+import { getResolvedSessionUser } from "@/lib/server/erpnext";
+import { readSessionUser } from "@/lib/session";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-
-function safeDecodeURIComponent(value: string) {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
-  }
-}
 
 export default async function AuthenticatedLayout({
   children
@@ -25,32 +19,7 @@ export default async function AuthenticatedLayout({
     redirect("/login");
   }
 
-  let user:
-    | {
-        email?: string;
-        displayName?: string;
-      }
-    | null = null;
-
-  if (hasEncodedUser?.value) {
-    try {
-      user = JSON.parse(safeDecodeURIComponent(hasEncodedUser.value)) as { email?: string; displayName?: string };
-    } catch {
-      user = null;
-    }
-  }
-
-  if (!user && hasUser?.value) {
-    try {
-      user = JSON.parse(hasUser.value) as { email?: string; displayName?: string };
-    } catch {
-      try {
-        user = JSON.parse(safeDecodeURIComponent(hasUser.value)) as { email?: string; displayName?: string };
-      } catch {
-        user = null;
-      }
-    }
-  }
+  const user = await getResolvedSessionUser(readSessionUser(cookieStore), hasSid?.value);
 
   return <AppShell user={user}>{children}</AppShell>;
 }

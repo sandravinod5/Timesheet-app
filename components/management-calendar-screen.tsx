@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Plus, RefreshCw, UserRound } from "lucide-react";
+import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Clock3, Plus, RefreshCw, UserRound } from "lucide-react";
 import { fetchPartnerCalendarAction } from "@/lib/client";
 import type { PartnerCalendarCustomersData, PartnerCalendarData, PartnerCalendarEntry, SelectOption } from "@/lib/types";
 import { Button, EmptyState, InputShell, LoadingState, Modal, Panel } from "@/components/ui";
@@ -338,11 +338,15 @@ function DayModal({
 
 export function ManagementCalendarScreen({
   embedded = false,
+  open = true,
   refreshToken = 0,
+  onToggleOpen,
   onEntriesChanged
 }: {
   embedded?: boolean;
+  open?: boolean;
   refreshToken?: number;
+  onToggleOpen?: () => void;
   onEntriesChanged?: () => void;
 }) {
   const [monthCursor, setMonthCursor] = useState<Date | null>(null);
@@ -356,14 +360,20 @@ export function ManagementCalendarScreen({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [optionsLoaded, setOptionsLoaded] = useState(false);
+  const monthCacheRef = useRef<Record<string, PartnerCalendarData>>({});
+  const inFlightPrefetchRef = useRef<Record<string, boolean>>({});
 
-  const load = async (options?: { silent?: boolean; includeOptions?: boolean }) => {
-    if (!monthCursor) {
-      return;
+  const load = async (targetMonth: Date, options?: { silent?: boolean; includeOptions?: boolean; preferCache?: boolean }) => {
+    const monthKey = `${targetMonth.getFullYear()}-${pad(targetMonth.getMonth() + 1)}`;
+    const cachedData = monthCacheRef.current[monthKey];
+    const silent = options?.silent ?? Boolean(data || cachedData);
+    const includeOptions = Boolean(options?.includeOptions) || !optionsLoaded;
+    const preferCache = options?.preferCache !== false;
+
+    if (preferCache && cachedData) {
+      setData(cachedData);
     }
 
-    const silent = Boolean(options?.silent);
-    const includeOptions = Boolean(options?.includeOptions) || !optionsLoaded;
     if (silent) {
       setRefreshing(true);
     } else {
@@ -372,8 +382,28 @@ export function ManagementCalendarScreen({
 
     setError(null);
 
-    const fromDate = dateKey(firstOfMonth(monthCursor));
-    const toDate = dateKey(endOfMonth(monthCursor));
+    const fromDate = dateKey(firstOfMonth(targetMonth));
+    const toDate = dateKey(endOfMonth(targetMonth));
+
+    const prefetchMonth = async (date: Date) => {
+      const prefetchKey = `${date.getFullYear()}-${pad(date.getMonth() + 1)}`;
+      if (monthCacheRef.current[prefetchKey] || inFlightPrefetchRef.current[prefetchKey]) {
+        return;
+      }
+
+      inFlightPrefetchRef.current[prefetchKey] = true;
+      try {
+        const response = await fetchPartnerCalendarAction<PartnerCalendarData>("monthly_entries", {
+          from_date: dateKey(firstOfMonth(date)),
+          to_date: dateKey(endOfMonth(date))
+        });
+        monthCacheRef.current[prefetchKey] = response.data;
+      } catch {
+        return;
+      } finally {
+        delete inFlightPrefetchRef.current[prefetchKey];
+      }
+    };
 
     try {
       const requests: Array<Promise<unknown>> = [
@@ -395,7 +425,11 @@ export function ManagementCalendarScreen({
         throw entriesResult.reason;
       }
 
+      monthCacheRef.current[monthKey] = entriesResult.value.data;
       setData(entriesResult.value.data);
+
+      void prefetchMonth(shiftMonth(targetMonth, -1));
+      void prefetchMonth(shiftMonth(targetMonth, 1));
 
       if (includeOptions) {
         const customersResult = results[1] as PromiseSettledResult<{ data: PartnerCalendarCustomersData }>;
@@ -403,13 +437,13 @@ export function ManagementCalendarScreen({
 
         if (customersResult.status === "fulfilled") {
           setCustomerOptions(sanitizeOptions(customersResult.value.data.customers || []));
-        } else {
+        } else if (customerOptions.length === 0) {
           setCustomerOptions([]);
         }
 
         if (usersResult.status === "fulfilled") {
           setUserOptions(sanitizeOptions(usersResult.value.data.users || []));
-        } else {
+        } else if (userOptions.length === 0) {
           setUserOptions([]);
         }
 
@@ -418,7 +452,9 @@ export function ManagementCalendarScreen({
         }
       }
     } catch (loadError) {
-      setData(null);
+      if (!cachedData && !data) {
+        setData(null);
+      }
       setError(loadError instanceof Error ? loadError.message : "Calendar could not be loaded.");
     } finally {
       setLoading(false);
@@ -435,7 +471,10 @@ export function ManagementCalendarScreen({
       return;
     }
 
-    void load({ includeOptions: !optionsLoaded });
+    void load(monthCursor, {
+      silent: Boolean(data || monthCacheRef.current[`${monthCursor.getFullYear()}-${pad(monthCursor.getMonth() + 1)}`]),
+      includeOptions: !optionsLoaded
+    });
   }, [monthCursor, refreshToken]);
 
   const groupedEntries = useMemo(() => groupEntriesByDate(data?.entries || []), [data?.entries]);
@@ -469,7 +508,7 @@ export function ManagementCalendarScreen({
 
       setSelectedDate(null);
       setForm({ customer: "", user: "", timeslots: [] });
-      await load({ silent: true });
+      await load(monthCursor || new Date(), { silent: true, preferCache: true });
       onEntriesChanged?.();
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Calendar entry could not be saved.");
@@ -478,98 +517,111 @@ export function ManagementCalendarScreen({
     }
   };
 
-  if (!monthCursor || loading) {
+  if (!monthCursor || (loading && !data)) {
     return <LoadingState label="Loading management calendar..." />;
   }
 
   return (
     <div className={embedded ? "screen-stack screen-stack--single management-calendar-embedded" : "screen-stack"}>
-      <Panel className="management-planner-hero">
-        <div className="partner-calendar-hero-copy">
-          <p className="panel-eyebrow">{embedded ? "Calendar overview" : "Management calendar"}</p>
-          <h2 className="panel-title">Calendar</h2>
-          <p className="panel-subtitle">
-            Monthly calendar for Management Users. Click any day to assign customer, user, and timeslot.
-          </p>
-          {error ? <p className="partner-calendar-inline-error">{error}</p> : null}
+      <Panel className="management-calendar-summary-card">
+        <div className="management-planner-hero">
+          <div className="partner-calendar-hero-copy">
+            <p className="panel-eyebrow">{embedded ? "Calendar overview" : "Management calendar"}</p>
+            <h2 className="panel-title">Calendar</h2>
+            <p className="panel-subtitle">
+              Monthly calendar for Management Users. Click any day to assign customer, user, and timeslot.
+            </p>
+            {error ? <p className="partner-calendar-inline-error">{error}</p> : null}
+          </div>
+          <div className="management-planner-actions">
+            <button
+              className={refreshing ? "ghost-button is-spinning" : "ghost-button"}
+              onClick={() => void load(monthCursor, { silent: true, includeOptions: true, preferCache: true })}
+              aria-label="Refresh calendar"
+              type="button"
+            >
+              <RefreshCw size={18} />
+            </button>
+            <button
+              type="button"
+              className="ghost-button management-card-toggle"
+              aria-expanded={open}
+              aria-label={open ? "Collapse calendar" : "Expand calendar"}
+              onClick={onToggleOpen}
+            >
+              <ChevronDown size={18} className={`collapsible-chevron ${open ? "is-open" : ""}`} />
+            </button>
+          </div>
         </div>
-        <div className="management-planner-actions">
-          <button
-            className={refreshing ? "ghost-button is-spinning" : "ghost-button"}
-            onClick={() => void load({ silent: true, includeOptions: true })}
-            aria-label="Refresh calendar"
-            type="button"
-          >
-            <RefreshCw size={18} />
-          </button>
-        </div>
+
+        {open ? (
+          <div className="partner-calendar-toolbar management-calendar-summary-toolbar">
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => setMonthCursor((current) => shiftMonth(current || new Date(), -1))}
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <div className="partner-calendar-period management-calendar-summary-period">
+              <CalendarDays size={18} />
+              <span>{formatMonthLabel(monthCursor)}</span>
+            </div>
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => setMonthCursor((current) => shiftMonth(current || new Date(), 1))}
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
+        ) : null}
       </Panel>
 
-      <Panel>
-        <div className="partner-calendar-toolbar">
-          <button
-            type="button"
-            className="ghost-button"
-            onClick={() => setMonthCursor((current) => shiftMonth(current || new Date(), -1))}
-          >
-            <ChevronLeft size={18} />
-          </button>
-          <div className="partner-calendar-period">
-            <CalendarDays size={18} />
-            <span>{formatMonthLabel(monthCursor)}</span>
-          </div>
-          <button
-            type="button"
-            className="ghost-button"
-            onClick={() => setMonthCursor((current) => shiftMonth(current || new Date(), 1))}
-          >
-            <ChevronRight size={18} />
-          </button>
-        </div>
-      </Panel>
+      {open ? (
+        <Panel>
+          <div className="management-month-scroll">
+            <div className="management-month-grid-head">
+              {WEEK_DAYS.map((day) => (
+                <div key={day} className="management-month-grid-head-cell">
+                  {day}
+                </div>
+              ))}
+            </div>
+            <div className="management-month-grid">
+              {monthDays.map((day) => {
+                const entries = groupedEntries[day.key] || [];
 
-      <Panel>
-        <div className="management-month-scroll">
-          <div className="management-month-grid-head">
-            {WEEK_DAYS.map((day) => (
-              <div key={day} className="management-month-grid-head-cell">
-                {day}
-              </div>
-            ))}
-          </div>
-          <div className="management-month-grid">
-            {monthDays.map((day) => {
-              const entries = groupedEntries[day.key] || [];
-
-              return (
-                <button
-                  key={day.key}
-                  type="button"
-                  className={day.inMonth ? "management-month-day" : "management-month-day management-month-day--muted"}
-                  onClick={() => {
-                    setSelectedDate(day.key);
-                    setForm({ customer: "", user: "", timeslots: [] });
-                  }}
-                >
-                  <div className="management-month-day-head">
-                    <strong>{day.dayNumber}</strong>
-                    <span>{entries.length}</span>
-                  </div>
-                  <div className="management-month-day-list">
-                    <div className="management-month-day-summary">
-                      {entries.length > 0 ? `${entries.length} ${entries.length === 1 ? "entry" : "entries"}` : "No entries"}
+                return (
+                  <button
+                    key={day.key}
+                    type="button"
+                    className={day.inMonth ? "management-month-day" : "management-month-day management-month-day--muted"}
+                    onClick={() => {
+                      setSelectedDate(day.key);
+                      setForm({ customer: "", user: "", timeslots: [] });
+                    }}
+                  >
+                    <div className="management-month-day-head">
+                      <strong>{day.dayNumber}</strong>
+                      <span>{entries.length}</span>
                     </div>
-                    <div className="meeting-day-empty">
-                      <Plus size={12} />
-                      <span>Add entry</span>
+                    <div className="management-month-day-list">
+                      <div className="management-month-day-summary">
+                        {entries.length > 0 ? `${entries.length} ${entries.length === 1 ? "entry" : "entries"}` : "No entries"}
+                      </div>
+                      <div className="meeting-day-empty">
+                        <Plus size={12} />
+                        <span>Add entry</span>
+                      </div>
                     </div>
-                  </div>
-                </button>
-              );
-            })}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      </Panel>
+        </Panel>
+      ) : null}
 
       {selectedDate ? (
         <DayModal

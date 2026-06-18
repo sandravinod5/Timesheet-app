@@ -1,11 +1,12 @@
 import type { ApiEnvelope } from "@/lib/types";
 
-export async function fetchAction<T>(
+export async function fetchApiAction<T>(
+  endpoint: string,
   action: string,
   params?: Record<string, string>,
   method: "GET" | "POST" = "GET"
 ) {
-  const url = new URL("/api/mobile-app", window.location.origin);
+  const url = new URL(endpoint, window.location.origin);
 
   if (method === "GET") {
     url.searchParams.set("action", action);
@@ -28,4 +29,20 @@ export async function fetchAction<T>(
   }
 
   return payload;
+}
+
+export async function fetchAction<T>(
+  action: string,
+  params?: Record<string, string>,
+  method: "GET" | "POST" = "GET"
+) {
+  return fetchApiAction<T>("/api/mobile-app", action, params, method);
+}
+
+export async function fetchPartnerCalendarAction<T>(
+  action: string,
+  params?: Record<string, string>,
+  method: "GET" | "POST" = "GET"
+) {
+  return fetchApiAction<T>("/api/partner-calendar", action, params, method);
 }

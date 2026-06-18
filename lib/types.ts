@@ -143,6 +143,55 @@ export type SelectOption = {
   shortName?: string | null;
 };
 
+export type PartnerCalendarEntry = {
+  name?: string;
+  docName?: string | null;
+  date: string;
+  customer: string;
+  customerName?: string | null;
+  user: string;
+  timeslot: string;
+};
+
+export type PartnerCalendarData = {
+  entries: PartnerCalendarEntry[];
+};
+
+export type PartnerCalendarCustomersData = {
+  customers: SelectOption[];
+};
+
+export type WeeklyPlannerColumn = {
+  key: string;
+  label: string;
+  shortName?: string | null;
+};
+
+export type WeeklyPlannerCell = {
+  customer: string;
+  docName?: string | null;
+};
+
+export type WeeklyPlannerRow = {
+  date: string;
+  dayLabel: string;
+  session: string;
+  entries: Record<string, WeeklyPlannerCell>;
+};
+
+export type WeeklyPlannerData = {
+  columns: WeeklyPlannerColumn[];
+  rows: WeeklyPlannerRow[];
+};
+
+export type WeeklyPlannerCellChange = {
+  date: string;
+  session: string;
+  user: string;
+  customer: string;
+  docName?: string | null;
+};
+
 export type TaskFormOptionsData = {
   projectTypes: SelectOption[];
   statuses: SelectOption[];

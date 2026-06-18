@@ -3895,7 +3895,659 @@ th {
   }
 }
 
+.role-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.8rem;
+  padding: 0.65rem 1.25rem;
+  border-radius: 999px;
+  color: var(--foreground);
+  background: linear-gradient(180deg, var(--surface-strong), var(--card-surface-end));
+  border: 1px solid var(--border);
+  box-shadow: inset 1px 1px 0 var(--card-inset-highlight), 8px 8px 18px var(--card-drop-shadow);
+  font-size: 0.95rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.management-meeting-screen {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+}
+
+.management-planner-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.management-calendar-summary-card {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  gap: 1rem;
+}
+
+.management-calendar-summary-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 0.35rem;
+  background: linear-gradient(90deg, #4b92ef 0%, #2a74dd 45%, #7bb8ff 100%);
+}
+
+.management-calendar-summary-card::after {
+  content: "";
+  position: absolute;
+  top: -4.5rem;
+  right: -3rem;
+  width: 15rem;
+  height: 15rem;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(75, 146, 239, 0.16) 0%, rgba(75, 146, 239, 0) 70%);
+  pointer-events: none;
+}
+
+.partner-calendar-hero-copy {
+  min-width: 0;
+}
+
+.partner-calendar-inline-error {
+  margin: 0.65rem 0 0;
+  color: var(--danger);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.management-planner-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.management-planner-toolbar,
+.partner-calendar-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.9rem;
+  flex-wrap: nowrap;
+}
+
+.partner-calendar-period {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  min-height: 3rem;
+  padding: 0.8rem 1rem;
+  border-radius: 1.15rem;
+  background: linear-gradient(180deg, var(--surface-strong), var(--card-surface-end));
+  border: 1px solid var(--border);
+  box-shadow: inset 1px 1px 0 var(--card-inset-highlight);
+  color: var(--foreground);
+  font-size: 0.98rem;
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.management-calendar-summary-toolbar {
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.management-calendar-summary-period {
+  min-height: 3.25rem;
+  background:
+    linear-gradient(180deg, rgba(75, 146, 239, 0.14), rgba(75, 146, 239, 0.06)),
+    linear-gradient(180deg, var(--surface-strong), var(--card-surface-end));
+  border-color: rgba(75, 146, 239, 0.2);
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.45),
+    0 10px 24px rgba(43, 116, 221, 0.08);
+}
+
+.management-calendar-summary-period svg {
+  color: #2a74dd;
+}
+
+.management-planner-toolbar {
+  align-items: center;
+}
+
+.management-planner-toolbar > .partner-calendar-toolbar {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.management-planner-toolbar > .partner-calendar-toolbar .ghost-button {
+  flex: 0 0 auto;
+}
+
+.management-planner-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+.management-planner-status,
+.management-planner-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 2.7rem;
+  padding: 0.65rem 1rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, var(--surface-strong), var(--card-surface-end));
+  box-shadow: inset 1px 1px 0 var(--card-inset-highlight);
+  color: var(--foreground);
+  font-size: 0.92rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.management-planner-panel {
+  grid-column: 1 / -1;
+  overflow: hidden;
+}
+
+.management-card-collapse-row {
+  margin-bottom: 0.9rem;
+}
+
+.management-card-toggle {
+  flex: 0 0 auto;
+}
+
+.management-planner-table-wrap {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: min(68vh, 42rem);
+  border-radius: 1.5rem;
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, var(--surface-strong), var(--card-surface-end));
+  scrollbar-color: #2e79eb rgba(122, 144, 245, 0.16);
+}
+
+.management-planner-table-wrap::-webkit-scrollbar,
+.management-month-scroll::-webkit-scrollbar,
+.searchable-select-menu::-webkit-scrollbar {
+  width: 0.7rem;
+  height: 0.7rem;
+}
+
+.management-planner-table-wrap::-webkit-scrollbar-thumb,
+.management-month-scroll::-webkit-scrollbar-thumb,
+.searchable-select-menu::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #4b91ef, #1c65cc);
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.28);
+}
+
+.management-planner-table-wrap::-webkit-scrollbar-track,
+.management-month-scroll::-webkit-scrollbar-track,
+.searchable-select-menu::-webkit-scrollbar-track {
+  background: linear-gradient(180deg, rgba(74, 144, 226, 0.14), rgba(74, 144, 226, 0.08));
+  border-radius: 999px;
+}
+
+.management-planner-table {
+  width: 100%;
+  min-width: 0;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+}
+
+.management-planner-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  padding: 1rem 0.95rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, #4a91eb 0%, #1f66cb 100%);
+  color: #fff;
+  font-size: 0.84rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  box-shadow: 0 10px 24px rgba(31, 102, 203, 0.16);
+}
+
+.management-planner-table thead th:first-child {
+  border-top-left-radius: 1.25rem;
+}
+
+.management-planner-table thead th:last-child {
+  border-top-right-radius: 1.25rem;
+}
+
+.management-planner-table tbody td {
+  padding: 0;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+[data-theme="dark"] .management-planner-table tbody td {
+  background: rgba(18, 24, 42, 0.58);
+}
+
+.management-planner-table tbody td:last-child,
+.management-planner-table thead th:last-child {
+  border-right: 0;
+}
+
+.management-planner-date-day-cell {
+  width: 9.5rem;
+  padding: 1.1rem 0.9rem !important;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.2) !important;
+}
+
+[data-theme="dark"] .management-planner-date-day-cell {
+  background: rgba(23, 31, 53, 0.88) !important;
+}
+
+.management-planner-date-text,
+.management-planner-day-text {
+  display: block;
+}
+
+.management-planner-date-text {
+  font-size: 1.05rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.management-planner-day-text {
+  margin-top: 0.35rem;
+  color: var(--muted);
+  font-size: 0.94rem;
+  font-weight: 700;
+}
+
+.management-planner-session-cell {
+  width: 7.5rem;
+  padding: 1rem 0.85rem !important;
+  text-align: center;
+  font-size: 0.96rem;
+  font-weight: 800;
+}
+
+.management-planner-entry-cell {
+  padding: 0.8rem 0.9rem !important;
+}
+
+.management-planner-input {
+  width: 100%;
+  min-height: 2.9rem;
+  border-radius: 0.95rem;
+  border: 1px solid rgba(122, 144, 245, 0.2);
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--foreground);
+  padding: 0.72rem 0.85rem;
+  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.55);
+  font-weight: 700;
+}
+
+[data-theme="dark"] .management-planner-input {
+  background: rgba(17, 23, 38, 0.86);
+  color: var(--foreground);
+}
+
+.management-planner-input::placeholder {
+  color: rgba(108, 122, 137, 0.8);
+  font-weight: 500;
+}
+
+.management-planner-cell-hint {
+  display: inline-block;
+  margin-top: 0.4rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.management-planner-day-end td {
+  border-bottom: 1px solid rgba(46, 121, 235, 0.5) !important;
+}
+
+.management-meeting-calendar-section,
+.management-calendar-embedded {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.management-calendar-embedded .management-planner-hero {
+  margin-bottom: 0;
+}
+
+.management-meeting-calendar-section .screen-stack {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.management-month-scroll {
+  overflow-x: auto;
+  padding-bottom: 0.35rem;
+  scrollbar-color: #2e79eb rgba(122, 144, 245, 0.12);
+}
+
+.management-month-grid-head,
+.management-month-grid {
+  min-width: 0;
+}
+
+.management-month-grid-head {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.55rem;
+  margin-bottom: 0.7rem;
+}
+
+.management-month-grid-head-cell {
+  padding: 0.8rem 0.25rem;
+  border-radius: 1rem;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: linear-gradient(180deg, var(--surface-strong), var(--card-surface-end));
+}
+
+.management-month-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.management-month-day {
+  min-height: 7.3rem;
+  padding: 0.85rem 0.75rem;
+  border-radius: 1.4rem;
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, var(--surface-strong), var(--card-surface-end));
+  box-shadow: inset 1px 1px 0 var(--card-inset-highlight);
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  text-align: left;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.management-month-day:hover {
+  transform: translateY(-2px);
+  border-color: rgba(74, 144, 226, 0.32);
+}
+
+.management-month-day--muted {
+  opacity: 0.6;
+}
+
+.management-month-day-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.management-month-day-head strong {
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.management-month-day-head span {
+  min-width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #2c72dc;
+  background: rgba(74, 144, 226, 0.12);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.management-month-day-list {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: auto;
+}
+
+.management-month-day-summary {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.meeting-day-empty {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--primary);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.management-calendar-modal {
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+  gap: 1.15rem;
+}
+
+.management-calendar-form,
+.management-calendar-day-entries {
+  min-width: 0;
+}
+
+.management-calendar-form {
+  display: grid;
+  gap: 1rem;
+  align-content: start;
+}
+
+.management-calendar-timeslots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.management-calendar-timeslot {
+  min-height: 2.8rem;
+  padding: 0.7rem 1rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, var(--surface-strong), var(--card-surface-end));
+  color: var(--foreground);
+  font-weight: 700;
+}
+
+.management-calendar-timeslot.is-active {
+  color: #fff;
+  border-color: rgba(43, 114, 255, 0.48);
+  background: linear-gradient(135deg, #4a91eb, #1f66cb);
+}
+
+.management-calendar-day-entries {
+  display: grid;
+  gap: 0.85rem;
+  align-content: start;
+}
+
+.partner-calendar-entry-list {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.partner-calendar-entry {
+  padding: 1rem;
+  border-radius: 1.2rem;
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, var(--surface-strong), var(--card-surface-end));
+  box-shadow: inset 1px 1px 0 var(--card-inset-highlight);
+}
+
+.partner-calendar-entry-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.partner-calendar-entry-title,
+.partner-calendar-entry-subtitle {
+  margin: 0;
+}
+
+.partner-calendar-entry-title {
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.partner-calendar-entry-subtitle {
+  margin-top: 0.3rem;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.partner-calendar-slot {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2.1rem;
+  padding: 0.45rem 0.8rem;
+  border-radius: 999px;
+  font-size: 0.84rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.partner-calendar-slot--morning {
+  color: #215dba;
+  background: rgba(74, 144, 226, 0.14);
+}
+
+.partner-calendar-slot--afternoon {
+  color: #8c5b00;
+  background: rgba(240, 173, 59, 0.18);
+}
+
+.partner-calendar-slot--evening {
+  color: #0e7a52;
+  background: rgba(20, 184, 122, 0.16);
+}
+
+.searchable-select-shell {
+  position: relative;
+}
+
+.searchable-select-input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--foreground);
+  padding: 0.15rem 2.1rem 0.15rem 0;
+}
+
+.searchable-select-toggle {
+  position: absolute;
+  right: 0.1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  color: var(--muted);
+}
+
+.searchable-select-menu {
+  margin-top: 0.5rem;
+  max-height: 14rem;
+  overflow: auto;
+  padding: 0.45rem;
+  border-radius: 1rem;
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, var(--surface-strong), var(--shell-surface));
+  box-shadow: 0 16px 36px rgba(10, 18, 32, 0.18);
+}
+
+.searchable-select-option,
+.searchable-select-empty {
+  width: 100%;
+  padding: 0.7rem 0.8rem;
+  border-radius: 0.8rem;
+  text-align: left;
+}
+
+.searchable-select-option {
+  color: var(--foreground);
+}
+
+.searchable-select-option:hover,
+.searchable-select-option.is-active {
+  background: rgba(74, 144, 226, 0.12);
+}
+
+.searchable-select-empty {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
 @media (max-width: 900px) {
+  .management-meeting-screen {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .management-planner-hero,
+  .management-planner-toolbar,
+  .partner-calendar-toolbar,
+  .partner-calendar-entry-row,
+  .management-calendar-modal {
+    grid-template-columns: none;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .management-planner-toolbar,
+  .partner-calendar-toolbar {
+    flex-wrap: wrap;
+  }
+
+  .management-calendar-summary-card {
+    gap: 0.85rem;
+  }
+
+  .management-planner-actions,
+  .management-planner-meta {
+    justify-content: flex-start;
+    margin-left: 0;
+  }
+
+  .management-meeting-calendar-section,
+  .management-calendar-embedded {
+    grid-column: auto;
+  }
+
   .visit-hero-stats {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -3917,6 +4569,115 @@ th {
 }
 
 @media (max-width: 640px) {
+  .management-planner-table-wrap {
+    max-height: min(62vh, 30rem);
+  }
+
+  .management-calendar-summary-card {
+    padding-top: 1.15rem;
+  }
+
+  .management-calendar-summary-card::before {
+    height: 0.26rem;
+  }
+
+  .role-chip {
+    min-height: 2.45rem;
+    padding: 0.55rem 0.9rem;
+    font-size: 0.86rem;
+  }
+
+  .management-calendar-summary-toolbar {
+    gap: 0.65rem;
+  }
+
+  .management-calendar-summary-period {
+    min-height: 2.85rem;
+    font-size: 0.9rem;
+  }
+
+  .management-planner-table {
+    min-width: 34rem;
+  }
+
+  .management-planner-date-day-cell {
+    width: 6.7rem;
+    padding: 0.8rem 0.55rem !important;
+  }
+
+  .management-planner-session-cell {
+    width: 5.1rem;
+    padding: 0.8rem 0.45rem !important;
+    font-size: 0.86rem;
+  }
+
+  .management-planner-entry-cell {
+    padding: 0.55rem 0.45rem !important;
+  }
+
+  .management-planner-date-text {
+    font-size: 0.88rem;
+  }
+
+  .management-planner-day-text {
+    font-size: 0.76rem;
+  }
+
+  .management-planner-table thead th {
+    padding: 0.8rem 0.35rem;
+    font-size: 0.68rem;
+    letter-spacing: 0.04em;
+  }
+
+  .management-planner-input {
+    min-height: 2.35rem;
+    padding: 0.5rem 0.55rem;
+    border-radius: 0.75rem;
+    font-size: 0.8rem;
+  }
+
+  .management-planner-cell-hint {
+    margin-top: 0.25rem;
+    font-size: 0.68rem;
+  }
+
+  .management-month-grid-head,
+  .management-month-grid {
+    gap: 0.42rem;
+  }
+
+  .management-month-grid-head-cell {
+    padding: 0.48rem 0.1rem;
+    font-size: 0.64rem;
+  }
+
+  .management-month-day {
+    min-height: 5.4rem;
+    padding: 0.48rem 0.38rem;
+    border-radius: 0.9rem;
+  }
+
+  .management-month-day-head strong {
+    font-size: 0.76rem;
+  }
+
+  .management-month-day-head span {
+    min-width: 1.25rem;
+    height: 1.25rem;
+    font-size: 0.62rem;
+  }
+
+  .management-month-day-summary,
+  .meeting-day-empty {
+    font-size: 0.62rem;
+    line-height: 1.2;
+  }
+
+  .meeting-day-empty svg {
+    width: 0.65rem;
+    height: 0.65rem;
+  }
+
   .visit-hero-stats {
     gap: 0.55rem;
     margin-top: 1rem;

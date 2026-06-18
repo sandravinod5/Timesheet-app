@@ -1,4 +1,4 @@
-import { callErpNextPartnerCalendarApp } from "@/lib/server/erpnext";
+import { callErpNextPartnerCalendarApp, getResolvedSessionUser } from "@/lib/server/erpnext";
 import { isPartnerCalendarUser, readSessionUser } from "@/lib/session";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
@@ -32,7 +32,7 @@ async function handleRequest(request: NextRequest) {
 
   const cookieStore = await cookies();
   const sid = cookieStore.get("erpnext_sid")?.value;
-  const currentUser = readSessionUser(cookieStore);
+  const currentUser = await getResolvedSessionUser(readSessionUser(cookieStore), sid);
 
   if (!isPartnerCalendarUser(currentUser)) {
     return NextResponse.json(

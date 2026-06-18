@@ -1,5 +1,7 @@
 "use client";
 
+import { isPartnerCalendarUser } from "@/lib/session";
+import type { SessionUser } from "@/lib/session";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
@@ -15,7 +17,7 @@ import {
   Sun
 } from "lucide-react";
 
-const navItems = [
+const defaultNavItems = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
   { href: "/tasks", label: "Tasks", icon: CheckSquare },
   { href: "/timesheet", label: "Timesheet", icon: Clock3 },
@@ -23,11 +25,13 @@ const navItems = [
   { href: "/reports", label: "Reports", icon: BarChart3 }
 ];
 
+const partnerCalendarNavItems = [
+  { href: "/", label: "Meeting", icon: CalendarDays },
+  { href: "/reports", label: "Reports", icon: BarChart3 }
+];
+
 type AppShellProps = React.PropsWithChildren<{
-  user?: {
-    email?: string;
-    displayName?: string;
-  } | null;
+  user?: SessionUser | null;
 }>;
 
 export function AppShell({ children, user }: AppShellProps) {
@@ -37,6 +41,8 @@ export function AppShell({ children, user }: AppShellProps) {
   const [profileOpen, setProfileOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
   const displayName = user?.displayName?.trim() || "Signed In User";
+  const partnerCalendarMode = isPartnerCalendarUser(user);
+  const navItems = partnerCalendarMode ? partnerCalendarNavItems : defaultNavItems;
 
   useEffect(() => {
     const stored = localStorage.getItem("theme");
@@ -116,6 +122,7 @@ export function AppShell({ children, user }: AppShellProps) {
               <Image src="/marks-leaps.png" alt="Marks and Leaps logo" width={150} height={66} className="brand-logo" priority />
             </button>
             <div className="header-actions">
+              {partnerCalendarMode ? <span className="role-chip">Meeting Mode</span> : null}
               <button className="ghost-button" onClick={toggleTheme} aria-label="Toggle theme">
                 {dark ? <Sun size={18} /> : <Moon size={18} />}
               </button>
